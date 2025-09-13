@@ -27,7 +27,7 @@ const studentDetailsSchema = new mongoose.Schema({
   address: { type: String, default: "" },
   pincode: { type: String, default: "" },
   dateOfBirth: { type: Date },
-  gender: { type: String, enum: ["Male", "Female", "Other"] },
+  gender: { type: String, enum: ["male", "female", "other"] },
   isVerified: { type: Boolean, default: false },
   // Avatar/Profile picture URL (for regular uploads)
   avatarUrl: { type: String, default: "" },

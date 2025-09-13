@@ -1,21 +1,37 @@
-
-
 // File: src/components/RegisterForm.jsx
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, User, Mail, Phone, MapPin, Lock, AlertCircle, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Phone, MapPin, Lock, AlertCircle, CheckCircle, Calendar } from "lucide-react";
 
-// Validation schema
+// --- Validation schema ---
+// Added: birthdate (string, date, minimum age 13) and gender (enum)
+const MIN_AGE = 13;
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   mobile: z.string().regex(/^[0-9]{10}$/, "Mobile number must be exactly 10 digits"),
-  password: z.string().min(6, "Password must be at least 6 characters").regex(/[0-9]/, "Password must contain at least one number").regex(/[a-zA-Z]/, "Password must contain at least one letter"),
+  password: z.string()
+    .min(6, "Password must be at least 6 characters")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(/[a-zA-Z]/, "Password must contain at least one letter"),
   address: z.string().min(5, "Address must be at least 5 characters"),
-  pincode: z.string().regex(/^[0-9]{6}$/, "Pincode must be exactly 6 digits")
+  pincode: z.string().regex(/^[0-9]{6}$/, "Pincode must be exactly 6 digits"),
+  birthdate: z.string().refine((val) => {
+    // validate date and min age
+    if (!val) return false;
+    const d = new Date(val);
+    if (Number.isNaN(d.getTime())) return false;
+    const now = new Date();
+    // calculate age in years
+    let age = now.getFullYear() - d.getFullYear();
+    const m = now.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+    return age >= MIN_AGE;
+  }, { message: `You must be at least ${MIN_AGE} years old` }),
+  gender: z.enum(['male','female','other'], { errorMap: () => ({ message: "Please select a gender" }) })
 });
 
 /**
@@ -33,16 +49,20 @@ export default function RegisterForm({ onSubmit, onSwitch }) {
     resolver: zodResolver(registerSchema),
   });
 
+  // today's date for date input max
+  const today = new Date().toISOString().split("T")[0];
+
   const handleRegisterSubmit = async (data) => {
     setIsSubmitting(true);
     setServerError("");
     try {
+      // data now contains: name, email, mobile, password, address, pincode, birthdate, gender
       const result = await onSubmit?.(data);
       const ok = typeof result === "object" ? result.success : result;
       if (ok) {
         setRegistrationSuccess(true);
         setTimeout(() => setRegistrationSuccess(false), 3000);
-        // Parent (LoginPage) will navigate to /otp and pass data via navigate state
+        // Parent (LoginPage) will navigate to /otp and pass data via navigate state if desired
       } else {
         setServerError(result?.message || "Registration failed");
       }
@@ -117,6 +137,35 @@ export default function RegisterForm({ onSubmit, onSwitch }) {
                 <input type="text" {...register("pincode")} placeholder="560001" className={`pl-10 mt-2 w-full px-4 py-3 border ${errors.pincode ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition`} />
               </div>
               {errors.pincode && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.pincode.message}</p>)}
+            </div>
+
+            {/* Birthdate (age) */}
+            <div className="md:col-span-1">
+              <label className="block text-sm font-medium text-gray-600 mb-1">Birthdate</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Calendar size={18} className="text-gray-400" /></div>
+                <input
+                  type="date"
+                  {...register("birthdate")}
+                  max={today}
+                  className={`pl-10 mt-2 w-full px-4 py-3 border ${errors.birthdate ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition`}
+                />
+              </div>
+              {errors.birthdate && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.birthdate.message}</p>)}
+            </div>
+
+            {/* Gender */}
+            <div className="md:col-span-1">
+              <label className="block text-sm font-medium text-gray-600 mb-1">Gender</label>
+              <div className="relative">
+                <select {...register("gender")} className={`pl-3 mt-2 w-full px-4 py-3 border ${errors.gender ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition`}>
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              {errors.gender && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.gender.message}</p>)}
             </div>
 
             {/* Address */}

@@ -142,10 +142,10 @@ export default function OtpVerification({ otpLength = 6, resendCooldownSec = 30 
 
     try {
        authService.verifyOTP(email, mobile, code);
-      setServerMsg("Verified! Redirecting to dashboard...");
+      setServerMsg("Verified! Redirecting to Login...!");
       setIsError(false);
       setTimeout(() => {
-        navigate("/dashboard");
+        navigate("/login");
       }, 800);
     } catch (error) {
       setServerMsg(error.message);

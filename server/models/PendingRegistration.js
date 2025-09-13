@@ -1,3 +1,4 @@
+// models/PendingRegistration.js
 import mongoose from "mongoose";
 
 const pendingRegistrationSchema = new mongoose.Schema(
@@ -28,6 +29,18 @@ const pendingRegistrationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+
+    birthdate: {
+      type: Date,
+      default: null,
+    },
+
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+      default: null,
+    },
+
     otp: {
       type: String,
       required: true,
@@ -39,7 +52,7 @@ const pendingRegistrationSchema = new mongoose.Schema(
     createdAt: {
       type: Date,
       default: Date.now,
-      expires: 1800 // Auto-delete after 30 minutes
+      expires: 1800
     }
   }
 );
