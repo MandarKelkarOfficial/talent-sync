@@ -2,7 +2,9 @@
 
 """
 Background Job Service
-Author: Maddy (Originally by Gemini)
+
+Author: Mandar . k
+Date: 2024-10-10
 
 This module manages the state of processing jobs. It includes the main
 background task that orchestrates the entire certificate verification flow.

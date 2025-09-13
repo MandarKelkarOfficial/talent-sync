@@ -88,7 +88,8 @@ import { fileURLToPath } from 'url';
 import authRoutes from "./routes/authRoutes.js";
 import resumeRoutes from './routes/resumeRoutes.js'; 
 import aptitudeRoutes from './routes/aptitudeRoutes.js';
-import faceProfileRoutes from './routes/faceProfileRoutes.js'; // NEW: Face profile routes
+import faceProfileRoutes from './routes/faceProfileRoutes.js'; 
+import certificateRoutes from './routes/certificateRoutes.js'; 
 
 dotenv.config();
 
@@ -127,7 +128,8 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use('/api/resumes', resumeRoutes); 
 app.use('/api/aptitude', aptitudeRoutes);
-app.use('/api/face-profile', faceProfileRoutes); // NEW: Face profile routes
+app.use('/api/face-profile', faceProfileRoutes); 
+app.use('/api/certificates', certificateRoutes); 
 
 // Error handling middleware (catches errors from routes)
 app.use((err, req, res, next) => {

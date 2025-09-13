@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const certificateSchema = new mongoose.Schema(
   {
     jobId: { type: String, required: true, unique: true },
-    userid: { type: mongoose.Schema.Types.ObjectId, ref: "StudentDetails", required: true },
+    studentId: { type: mongoose.Schema.Types.ObjectId, ref: "StudentDetails", required: true },
 
     filename: { type: String },
     contentType: { type: String },

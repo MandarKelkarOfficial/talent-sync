@@ -2,7 +2,8 @@
 
 """
 Configuration Management
-Author: Maddy (Originally by Gemini)
+Author: Mandar . k
+Date: 2024-10-10
 
 This module handles the loading and validation of environment variables
 for the application using Pydantic's BaseSettings.

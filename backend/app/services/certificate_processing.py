@@ -2,7 +2,8 @@
 
 """
 Certificate Processing Service
-Author: Maddy (Originally by Gemini)
+Author: Mandar . k
+Date: 2024-10-10
 
 This module provides functions for extracting data from certificate files (PDFs, images).
 This includes text extraction, OCR, QR code scanning, and heuristic analysis.

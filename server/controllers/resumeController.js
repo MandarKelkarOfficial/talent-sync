@@ -311,7 +311,7 @@ const parseResumeFile = async (filePath, mimetype) => {
  * Enhanced upload resume function
  */
 export const uploadResume = async (req, res) => {
-    console.log('=== Enhanced Resume Upload Started ===');
+    // console.log('=== Enhanced Resume Upload Started ===');
     
     try {
         if (!req.file) {
@@ -319,13 +319,13 @@ export const uploadResume = async (req, res) => {
             return res.status(400).json({ message: 'No file was uploaded.' });
         }
 
-        console.log('Uploaded file details:', {
-            filename: req.file.filename,
-            originalname: req.file.originalname,
-            path: req.file.path,
-            mimetype: req.file.mimetype,
-            size: req.file.size
-        });
+        // console.log('Uploaded file details:', {
+        //     filename: req.file.filename,
+        //     originalname: req.file.originalname,
+        //     path: req.file.path,
+        //     mimetype: req.file.mimetype,
+        //     size: req.file.size
+        // });
 
         const { studentId, title } = req.body;
         console.log('Request body:', { studentId, title });
@@ -342,14 +342,14 @@ export const uploadResume = async (req, res) => {
         const parseResult = await parseResumeFile(req.file.path, req.file.mimetype);
         
         const { fullText, structured } = parseResult;
-        console.log(`Successfully parsed resume. Text length: ${fullText.length}`);
-        console.log('Structured data extracted:', {
-            hasPersonalInfo: !!structured.personalInfo,
-            skillsCount: structured.skills.length,
-            experienceCount: structured.experience.length,
-            educationCount: structured.education.length,
-            projectsCount: structured.projects.length
-        });
+        console.log(`Successfully parsed resume. `);
+        // console.log('Structured data extracted:', {
+        //     hasPersonalInfo: !!structured.personalInfo,
+        //     skillsCount: structured.skills.length,
+        //     experienceCount: structured.experience.length,
+        //     educationCount: structured.education.length,
+        //     projectsCount: structured.projects.length
+        // });
 
         // Create resume with structured data
         const newResume = new Resume({
@@ -412,188 +412,6 @@ export const uploadResume = async (req, res) => {
 };
 
 
-
-/**
- * Enhanced ATS score calculation with AI-powered insights
- */
-// export const calculateAtsScore = async (req, res) => {
-//     try {
-//         const { resumeId } = req.params;
-//         const { jobDescription } = req.body;
-
-//         if (!jobDescription) {
-//             return res.status(400).json({ message: 'Job description is required.' });
-//         }
-
-//         const resume = await Resume.findById(resumeId);
-//         if (!resume || !resume.fullText) {
-//             return res.status(404).json({ message: 'Resume not found or not parsed.' });
-//         }
-
-//         console.log('Calculating ATS score for resume:', resume.title);
-
-//         // Enhanced keyword matching
-//         const jdKeywords = jobDescription.toLowerCase().match(/\b(\w+)\b/g) || [];
-//         const resumeKeywords = resume.fullText.toLowerCase().match(/\b(\w+)\b/g) || [];
-
-//         // Filter out short words and common words
-//         const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'a', 'an', 'is', 'are', 'was', 'were', 'will', 'would', 'could', 'should']);
-//         const jdKeywordSet = new Set(jdKeywords.filter(kw => kw.length > 3 && !stopWords.has(kw)));
-//         const matchedKeywords = [...new Set(resumeKeywords.filter(kw => jdKeywordSet.has(kw)))];
-
-//         // Calculate base score
-//         const keywordScore = Math.min(50, Math.round((matchedKeywords.length / (jdKeywordSet.size || 1)) * 100));
-        
-//         // Bonus points for structured data
-//         let bonusPoints = 0;
-//         if (resume.skills && resume.skills.length > 0) bonusPoints += 10;
-//         if (resume.experience && resume.experience.length > 0) bonusPoints += 15;
-//         if (resume.education && resume.education.length > 0) bonusPoints += 10;
-//         if (resume.projects && resume.projects.length > 0) bonusPoints += 10;
-//         if (resume.structuredData?.personalInfo?.email) bonusPoints += 5;
-
-//         const finalScore = Math.min(100, keywordScore + bonusPoints);
-
-//         // Generate AI-powered insights using Gemini
-//         let aiInsights = null;
-//         try {
-//             const insightsPrompt = `
-//             Analyze this resume against the job description and provide detailed ATS optimization insights:
-
-//             Job Description:
-//             ${jobDescription}
-
-//             Resume Content:
-//             ${resume.fullText}
-
-//             Please provide insights in this JSON format:
-//             {
-//                 "summary": "Brief overall assessment of the match",
-//                 "strengths": [
-//                     "List 3-5 key strengths of this resume for this role"
-//                 ],
-//                 "improvementAreas": [
-//                     "List 3-5 specific areas for improvement"
-//                 ],
-//                 "missingKeywords": [
-//                     "List important keywords from job description missing from resume"
-//                 ],
-//                 "recommendedActions": [
-//                     "List 3-5 specific actionable recommendations"
-//                 ]
-//             }
-
-//             Focus on practical, specific advice for improving ATS compatibility.
-//             `;
-
-//             const insightsResponse = await axios.post(
-//                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GOOGLE_API_KEY}`,
-//                 {
-//                     contents: [{
-//                         parts: [{
-//                             text: insightsPrompt
-//                         }]
-//                     }]
-//                 },
-//                 { timeout: 30000 }
-//             );
-
-//             const geminiInsights = insightsResponse.data.candidates?.[0]?.content?.parts?.[0]?.text;
-            
-//             if (geminiInsights) {
-//                 try {
-//                     const jsonMatch = geminiInsights.match(/```json\n(.*?)\n```/s) || 
-//                                      geminiInsights.match(/```\n(.*?)\n```/s) ||
-//                                      [null, geminiInsights];
-                    
-//                     const jsonStr = jsonMatch[1] || geminiInsights;
-//                     aiInsights = JSON.parse(jsonStr);
-//                     console.log('Successfully generated AI insights');
-//                 } catch (jsonError) {
-//                     console.error('Failed to parse AI insights JSON');
-//                 }
-//             }
-//         } catch (aiError) {
-//             console.error('Gemini API error for insights:', aiError.message);
-//         }
-
-//         // Fallback insights if AI fails
-//         const fallbackInsights = {
-//             summary: `This resume shows a ${finalScore > 75 ? 'strong' : finalScore > 50 ? 'moderate' : 'weak'} alignment with the job description.`,
-//             strengths: [
-//                 resume.skills?.length > 5 ? "Good variety of technical skills listed" : null,
-//                 resume.experience?.length > 0 ? "Relevant work experience documented" : null,
-//                 matchedKeywords.length > 10 ? "Strong keyword matching with job requirements" : null
-//             ].filter(Boolean),
-//             improvementAreas: [
-//                 "Add more specific keywords from the job description",
-//                 "Quantify achievements with numbers and metrics",
-//                 "Tailor experience descriptions to match job requirements"
-//             ],
-//             missingKeywords: [...jdKeywordSet].filter(kw => !matchedKeywords.includes(kw)).slice(0, 10),
-//             recommendedActions: [
-//                 "Review job description for missing technical skills",
-//                 "Add relevant certifications if available",
-//                 "Use action verbs that match the job posting",
-//                 "Include industry-specific terminology"
-//             ]
-//         };
-
-//         const insights = aiInsights || fallbackInsights;
-
-//         // Enhanced match info
-//         const matchInfo = {
-//             level: finalScore > 85 ? 'Top' : finalScore > 70 ? 'High' : finalScore > 50 ? 'Good' : 'Low',
-//             description: finalScore > 85 ? "Excellent match! Ready to submit." : 
-//                         finalScore > 70 ? "Strong match with minor improvements needed." :
-//                         finalScore > 50 ? "Good foundation but needs optimization." : 
-//                         "Significant improvements needed for better ATS compatibility."
-//         };
-
-//         // Prepare comprehensive ATS data
-//         const atsData = {
-//             score: finalScore,
-//             summary: insights.summary,
-//             matchedKeywords: matchedKeywords.slice(0, 20), // Limit to top 20
-//             improvementTips: insights.recommendedActions || fallbackInsights.recommendedActions,
-//             matchInfo,
-//             detailedInsights: {
-//                 strengths: insights.strengths || fallbackInsights.strengths,
-//                 improvementAreas: insights.improvementAreas || fallbackInsights.improvementAreas,
-//                 missingKeywords: insights.missingKeywords || fallbackInsights.missingKeywords,
-//                 keywordMatchRate: `${Math.round((matchedKeywords.length / jdKeywordSet.size) * 100)}%`,
-//                 totalKeywords: jdKeywordSet.size,
-//                 matchedCount: matchedKeywords.length
-//             },
-//             analysis: {
-//                 hasStructuredData: !!resume.structuredData,
-//                 skillsCount: resume.skills?.length || 0,
-//                 experienceCount: resume.experience?.length || 0,
-//                 bonusPoints: bonusPoints
-//             }
-//         };
-
-//         // Update resume with enhanced ATS data
-//         resume.ats = atsData;
-//         await resume.save();
-
-//         res.status(200).json({ 
-//             message: 'ATS score calculated successfully with AI insights.', 
-//             ats: atsData,
-//             aiEnhanced: true
-//         });
-
-//     } catch (error) {
-//         console.error('Enhanced ATS calculation error:', error);
-//         res.status(500).json({ 
-//             message: 'Server error during ATS calculation.',
-//             error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-//         });
-//     }
-// };
-
-
-
 export const calculateAtsScore = async (req, res) => {
   try {
     const { resumeId } = req.params;
@@ -612,8 +430,8 @@ export const calculateAtsScore = async (req, res) => {
     const normalizeTokens = (text) => {
       return (text || '')
         .toLowerCase()
-        .replace(/[\u2018\u2019\u201c\u201d"]/g, '') // smart quotes
-        .replace(/[^a-z0-9\s\-_.+]/g, ' ') // keep hyphen/dot/underscore/plus for tokens like node-js, c++ etc.
+        .replace(/[\u2018\u2019\u201c\u201d"]/g, '') 
+        .replace(/[^a-z0-9\s\-_.+]/g, ' ') 
         .split(/\s+/)
         .map(t => t.trim())
         .filter(Boolean);
@@ -736,6 +554,7 @@ Only return valid JSON.
         const jsonStr = jsonMatch[1] || gemini;
         try {
           aiInsights = JSON.parse(jsonStr);
+          console.log('Gemini insights parsed successfully AI insights:', aiInsights);
         } catch (pe) {
           console.error('Failed parsing Gemini insights JSON', pe);
         }
@@ -798,6 +617,7 @@ Only return valid JSON.
 
     // persist
     resume.ats = atsData;
+    console.log('Persisting ATS data to resume record...', atsData);
     await resume.save();
 
     return res.status(200).json({

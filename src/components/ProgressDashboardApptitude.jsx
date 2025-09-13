@@ -202,7 +202,7 @@ const ProgressDashboard = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 px-4 py-6">
+    <div className="max-w-8xl mx-auto space-y-6 px-4 py-6">
       {/* Header Stats */}
       <div className="relative rounded-2xl overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 transform-gpu  scale-105 opacity-95"></div>
@@ -309,7 +309,7 @@ const ProgressDashboard = () => {
       {progressData.topicProgress && progressData.topicProgress.length > 0 && (
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-4">Topic-wise Progress</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-4 gap-4">
             {progressData.topicProgress.map(topic => (
               <TopicProgressCard key={topic.topic} topic={topic} />
             ))}

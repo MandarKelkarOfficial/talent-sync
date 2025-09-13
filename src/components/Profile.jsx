@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import FaceCapture from './FaceCapture';
 import '../assets/css/Profile.css';
+import CertificateUploader from './CertificateUploader';
 
 const Profile = ({ onProfileUpdated }) => {
   const { user: authUser, setUser } = useAuth();
@@ -494,6 +495,12 @@ const Profile = ({ onProfileUpdated }) => {
               </div>
             )}
           </form>
+
+
+{/* Certificate Uploading component */}
+
+<CertificateUploader/>
+          
 
           {/* Account info cards */}
           <div className="mt-8 pt-6 border-t border-gray-100">

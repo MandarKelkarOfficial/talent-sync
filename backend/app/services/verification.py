@@ -2,7 +2,9 @@
 
 """
 External Verification Service
-Author: Maddy (Originally by Gemini)
+
+Author: Mandar . k
+Date: 2024-10-10
 
 This module contains functions for performing verifications that require
 external network calls, such as checking QR code links, parsing verification
