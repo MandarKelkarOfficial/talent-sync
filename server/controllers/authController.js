@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 import fs from "fs";
 import path from "path";
+import jwt from 'jsonwebtoken';
 import { fileURLToPath } from 'url';
 import StudentDetails from "../models/StudentDetails.js";
 import PendingRegistration from "../models/PendingRegistration.js";
@@ -170,7 +171,7 @@ export const authController = {
         isVerified: true,
         accountStatus: 'active',
         dateOfBirth: pendingRegistration.birthdate ? new Date(pendingRegistration.birthdate) : pendingRegistration.dateOfBirth || undefined,
-        gender: pendingRegistration.gender 
+        gender: pendingRegistration.gender
       });
 
       console.log("Creating new user:", newUser);
@@ -317,6 +318,19 @@ export const authController = {
         });
       }
 
+      // 👇 --- THIS IS THE NEW PART ---
+      // Create JWT Payload
+      const payload = {
+        id: user._id,
+        name: user.name,
+      };
+
+      // Sign the token
+      const token = jwt.sign(payload, process.env.JWT_SECRET, {
+        expiresIn: '1d', // Token expires in 1 day
+      });
+      // --- END OF NEW PART ---
+
       // Update last login
       user.lastLogin = new Date();
       await user.save();
@@ -327,6 +341,7 @@ export const authController = {
       res.json({
         success: true,
         message: "Login successful",
+        token: token, 
         user: userData
       });
 

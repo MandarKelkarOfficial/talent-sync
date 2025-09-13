@@ -20,11 +20,37 @@ from app.core.config import settings
 from app.models.schemas import VerifyRequest
 from app.services import jobs, face_analysis
 
+from contextlib import asynccontextmanager
+from .core.config import settings
+from .utils import security
+import base64
+
+
+
+
+# --- NEW: Lifespan event handler to initialize resources on startup ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Code to run on startup
+    print("🚀 Application startup...")
+    try:
+        key_bytes = base64.b64decode(settings.AES_KEY_BASE64)
+        security.initialize_aes_key(key_bytes)
+    except Exception as e:
+        print(f"❌ FATAL: Could not initialize AES key from .env: {e}")
+        # In a real app, you might want to exit if the key is essential
+    yield
+    # Code to run on shutdown
+    print("👋 Application shutdown.")
+
+
+
 # --- FastAPI App Initialization ---
 app = FastAPI(
-    title="CertProcessor Microservice",
-    description="Processes and verifies digital certificates and performs face analysis.",
-    version="1.0.0"
+    title="TalentSync Verification Microservice",
+    description="Processes and verifies certificates and face profiles.",
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(

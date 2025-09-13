@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import FaceCapture from './FaceCapture';
 import '../assets/css/Profile.css';
 import CertificateUploader from './CertificateUploader';
+import CertificateStatus from './CertificateStatus';
 
 const Profile = ({ onProfileUpdated }) => {
   const { user: authUser, setUser } = useAuth();
@@ -500,6 +501,7 @@ const Profile = ({ onProfileUpdated }) => {
 {/* Certificate Uploading component */}
 
 <CertificateUploader/>
+<CertificateStatus/>
           
 
           {/* Account info cards */}
