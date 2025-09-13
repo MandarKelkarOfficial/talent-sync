@@ -1,13 +1,16 @@
-// Profile.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import FaceCapture from './FaceCapture';
+import '../assets/css/Profile.css';
 
 const Profile = ({ onProfileUpdated }) => {
   const { user: authUser, setUser } = useAuth();
   const navigate = useNavigate();
+
+
+  const serverUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:5000"
 
   const [form, setForm] = useState({
     name: '',
@@ -43,7 +46,16 @@ const Profile = ({ onProfileUpdated }) => {
         gender: authUser.gender || ''
       });
 
-      setAvatarPreview(authUser.avatarUrl || '');
+      // *** INTEGRATION CHANGE 1: Correctly set the avatar URL ***
+      // If the user's face is verified, construct the URL to the dedicated image endpoint.
+      // Otherwise, fall back to the manually uploaded avatarUrl.
+     
+      if (authUser.faceVerified) {
+        setAvatarPreview(`${serverUrl}/api/face-profile/${authUser._id}/image`);
+      } else {
+        setAvatarPreview(authUser.avatarUrl || '');
+
+      }
     }
     // cleanup on unmount
     return () => {
@@ -110,19 +122,24 @@ const Profile = ({ onProfileUpdated }) => {
       });
 
       if (response.data?.success) {
-        // revoke previous preview if any
+        // *** INTEGRATION CHANGE 2: Update state after successful face capture ***
+
+        // The new, persistent URL for the captured face image.
+        // Appending a timestamp busts the browser cache, ensuring the new image is shown immediately.
+        const newAvatarUrl = `/api/face-profile/${authUser._id}/image?t=${new Date().getTime()}`;
+
+        setAvatarPreview(newAvatarUrl); // Update the preview to use the server endpoint.
+        setAvatarFile(faceBlob); // Keep the blob for the manual "Save Changes" logic.
+
+        // Update the global user state with the correct URL and verified status.
+        if (setUser && authUser) {
+          setUser({ ...authUser, faceVerified: true, avatarUrl: newAvatarUrl });
+        }
+
+        // Clean up any old temporary blob URLs to prevent memory leaks.
         if (currentObjectUrl.current) {
           try { URL.revokeObjectURL(currentObjectUrl.current); } catch (e) { }
           currentObjectUrl.current = null;
-        }
-        const url = URL.createObjectURL(faceBlob);
-        currentObjectUrl.current = url;
-        setAvatarPreview(url);
-        setAvatarFile(faceBlob);
-
-        // update context user (optimistic)
-        if (setUser && authUser) {
-          setUser({ ...authUser, faceVerified: true, avatarUrl: response.data?.avatarUrl || authUser.avatarUrl });
         }
 
         showMessage({ type: 'success', text: 'Face captured successfully! This will be your profile picture.' });
@@ -208,7 +225,6 @@ const Profile = ({ onProfileUpdated }) => {
         birthdate: authUser.dateOfBirth ? new Date(authUser.dateOfBirth).toISOString().split('T')[0] : '',
         gender: authUser.gender || ''
       });
-
     }
     if (currentObjectUrl.current) {
       try { URL.revokeObjectURL(currentObjectUrl.current); } catch (e) { }
@@ -246,17 +262,13 @@ const Profile = ({ onProfileUpdated }) => {
 
               {/* Controls near avatar */}
               <div className="absolute -bottom-1 -right-1 flex gap-2">
-
-
                 <label className="bg-white hover:bg-indigo-50 text-indigo-600 rounded-full p-2 shadow-md cursor-pointer transition-all duration-300 hover:scale-110">
-
                   <button
                     onClick={() => setShowFaceCapture(true)}
                     disabled={loading || uploadingFace}
                     title="Capture with camera"
                     hidden
                   >
-
                   </button>
 
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -547,15 +559,7 @@ const Profile = ({ onProfileUpdated }) => {
         onClose={() => setShowFaceCapture(false)}
       />
 
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-          animation: fadeIn 0.3s ease-out forwards;
-        }
-      `}</style>
+
     </div>
   );
 };
