@@ -52,7 +52,6 @@ const CertificateStatus = () => {
      * @param {string} certificateId - The ID of the certificate to delete.
      */
     const handleDelete = async (certificateId) => {
-        if (window.confirm('Are you sure you want to delete this certificate? This action cannot be undone.')) {
             try {
                 await api.delete(`/api/certificates/${certificateId}`);
                 // Instantly update the UI by removing the deleted certificate from the state.
@@ -61,7 +60,7 @@ const CertificateStatus = () => {
                 console.error('Failed to delete certificate:', err);
                 setError(err.response?.data?.message || 'Could not delete the certificate. Please try again.');
             }
-        }
+        
     };
 
     /**

@@ -19,8 +19,9 @@ class Settings(BaseSettings):
     """
     SERVER_ENDPOINT: str = "http://localhost:5000/api/certificates"
     AES_KEY_BASE64: str
+    HUGGINGFACE_API_KEY: str
     UPLOAD_DIR: str = "./encrypted_uploads"
-    POST_TIMEOUT_SECONDS: int = 10
+    POST_TIMEOUT_SECONDS: int = 30
     POST_RETRIES: int = 3
     TESSERACT_CMD: str | None = None
 
