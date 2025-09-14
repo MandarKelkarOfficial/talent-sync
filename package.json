@@ -1,7 +1,8 @@
 {
   "name": "talent-sync",
   "private": true,
-  "version": "0.0.0",
+  "author": "Mandar Kelkar",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
@@ -22,6 +23,7 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "framer-motion": "^12.23.12",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.542.0",
     "mammoth": "^1.10.0",
     "mongoose": "^8.18.0",

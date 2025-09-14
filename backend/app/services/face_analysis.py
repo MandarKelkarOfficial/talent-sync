@@ -2,7 +2,9 @@
 
 """
 Face Analysis Service
-Author: Maddy (Originally by Gemini)
+
+Author: Mandar . k
+Date: 2024-10-10
 
 This module contains functions for detecting faces in images, assessing their
 quality, and generating recommendations for users. It uses the `face_recognition`

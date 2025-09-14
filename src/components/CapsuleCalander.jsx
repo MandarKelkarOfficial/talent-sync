@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 import React, { useEffect, useState } from 'react';
 
 const CapsuleTimeOnly = () => {

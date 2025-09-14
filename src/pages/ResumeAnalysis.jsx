@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import ResumeUploader from '../components/ResumeUploader.jsx';
@@ -293,3 +299,4 @@ const ResumeAnalysis = () => {
 };
 
 export default ResumeAnalysis;
+

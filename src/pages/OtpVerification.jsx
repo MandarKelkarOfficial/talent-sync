@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 // src/pages/OtpVerification.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -142,10 +148,10 @@ export default function OtpVerification({ otpLength = 6, resendCooldownSec = 30 
 
     try {
        authService.verifyOTP(email, mobile, code);
-      setServerMsg("Verified! Redirecting to dashboard...");
+      setServerMsg("Verified! Redirecting to Login...!");
       setIsError(false);
       setTimeout(() => {
-        navigate("/dashboard");
+        navigate("/login");
       }, 800);
     } catch (error) {
       setServerMsg(error.message);

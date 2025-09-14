@@ -1,98 +1,87 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 // controllers/faceProfileController.js
 import FaceProfile from '../models/FaceProfile.js';
 import StudentDetails from '../models/StudentDetails.js';
 
 export const faceProfileController = {
   // Capture and store face image
+  // Capture and store face image
   capture: async (req, res) => {
     try {
       const { studentId } = req.body;
 
       if (!studentId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Student ID is required'
-        });
+        return res.status(400).json({ success: false, message: 'Student ID is required' });
       }
 
       if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: 'Face image is required'
-        });
+        return res.status(400).json({ success: false, message: 'Face image is required' });
       }
 
-      // Verify student exists
+      // --- START OF FIX ---
+
+      // Verify student exists and update their faceVerified status
       const student = await StudentDetails.findById(studentId);
       if (!student) {
-        return res.status(404).json({
-          success: false,
-          message: 'Student not found'
-        });
+        return res.status(404).json({ success: false, message: 'Student not found' });
       }
 
-      // Get image data
-      const imageBuffer = req.file.buffer;
-      const imageSize = imageBuffer.length;
+      // Set faceVerified to true
+      student.faceVerified = true;
 
-      // Create face profile data
+      // Also set the avatarUrl to the new dynamic endpoint
+      student.avatarUrl = `/api/face-profile/${studentId}/image`;
+
+      // --- END OF FIX ---
+
+      const imageBuffer = req.file.buffer;
+
       const faceProfileData = {
         studentId,
         faceImageBlob: imageBuffer,
         imageMetadata: {
           contentType: req.file.mimetype,
-          size: imageSize,
-          dimensions: {
-            width: 640, // Default from camera capture
-            height: 480
-          }
+          size: imageBuffer.length,
+          dimensions: { width: 640, height: 480 }
         },
         captureMetadata: {
           captureDate: new Date(),
           deviceInfo: req.headers['user-agent'] || 'Unknown',
-          confidence: 0.8, // Default confidence
+          confidence: 0.8,
           quality: 'medium'
         },
         isActive: true
       };
 
-      // Check if face profile already exists for this student
       const existingProfile = await FaceProfile.findOne({ studentId });
-      
+
       if (existingProfile) {
-        // Update existing profile
         Object.assign(existingProfile, faceProfileData);
-        existingProfile.verificationCount = 0; // Reset verification count
         await existingProfile.save();
-        
-        res.json({
-          success: true,
-          message: 'Face profile updated successfully',
-          data: {
-            faceProfileId: existingProfile._id,
-            studentId: existingProfile.studentId,
-            captureDate: existingProfile.captureMetadata.captureDate
-          }
-        });
       } else {
-        // Create new face profile
         const newFaceProfile = new FaceProfile(faceProfileData);
         await newFaceProfile.save();
-        
-        res.status(201).json({
-          success: true,
-          message: 'Face profile created successfully',
-          data: {
-            faceProfileId: newFaceProfile._id,
-            studentId: newFaceProfile.studentId,
-            captureDate: newFaceProfile.captureMetadata.captureDate
-          }
-        });
       }
+
+      // --- ANOTHER FIX: Save the updated student and return it ---
+      const updatedStudent = await student.save();
+      const { password, ...userResponse } = updatedStudent.toObject();
+
+
+      res.json({
+        success: true,
+        message: 'Face profile captured and verified successfully',
+        user: userResponse // Return the complete updated user object
+      });
+      // --- END OF FIX ---
 
     } catch (error) {
       console.error('Face capture error:', error);
-      
       res.status(500).json({
         success: false,
         message: 'Failed to save face profile',
@@ -131,11 +120,9 @@ export const faceProfileController = {
     }
   },
 
-  // Get face image
   getFaceImage: async (req, res) => {
     try {
       const { studentId } = req.params;
-
       const faceProfile = await FaceProfile.findOne({ studentId, isActive: true });
 
       if (!faceProfile || !faceProfile.faceImageBlob) {
@@ -145,11 +132,9 @@ export const faceProfileController = {
         });
       }
 
-      // Set proper headers for image response
       res.set({
         'Content-Type': faceProfile.imageMetadata.contentType,
         'Content-Length': faceProfile.faceImageBlob.length,
-        'Cache-Control': 'private, max-age=300' // Cache for 5 minutes
       });
 
       res.send(faceProfile.faceImageBlob);
@@ -162,6 +147,7 @@ export const faceProfileController = {
       });
     }
   },
+
 
   // Verify face against stored profile
   verifyFace: async (req, res) => {

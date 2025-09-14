@@ -1,20 +1,8 @@
-// // models/StudentDetails.js
-// import mongoose from "mongoose";
-
-// const studentDetailsSchema = new mongoose.Schema({
-//   name: { type: String, required: true, trim: true },
-//   email: { type: String, required: true, unique: true, lowercase: true },
-//   password: { type: String, required: true, minlength: 6 },
-//   phoneNumber: { type: String, required: true },
-//   address: { type: String, default: "" },   // store whole address string
-//   pincode: { type: String, default: "" },   // pincode field
-//   dateOfBirth: { type: Date },
-//   gender: { type: String, enum: ["Male", "Female", "Other"] },
-//   isVerified: { type: Boolean, default: false } // important!
-// }, { timestamps: true });
-
-// export default mongoose.model("StudentDetails", studentDetailsSchema);
-
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
 
 // models/StudentDetails.js
 import mongoose from "mongoose";
@@ -27,7 +15,7 @@ const studentDetailsSchema = new mongoose.Schema({
   address: { type: String, default: "" },
   pincode: { type: String, default: "" },
   dateOfBirth: { type: Date },
-  gender: { type: String, enum: ["Male", "Female", "Other"] },
+  gender: { type: String, enum: ["male", "female", "other"] },
   isVerified: { type: Boolean, default: false },
   // Avatar/Profile picture URL (for regular uploads)
   avatarUrl: { type: String, default: "" },
@@ -40,7 +28,7 @@ const studentDetailsSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Index for better query performance
-studentDetailsSchema.index({ email: 1 });
+// studentDetailsSchema.index({ email: 1 });
 studentDetailsSchema.index({ phoneNumber: 1 });
 
 export default mongoose.model("StudentDetails", studentDetailsSchema);

@@ -2,7 +2,8 @@
 
 """
 Pydantic Schemas
-Author: Maddy (Originally by Gemini)
+Author: Mandar . k
+Date: 2024-10-10
 
 This module defines the Pydantic models used for API request and response validation.
 """
