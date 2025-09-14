@@ -1,5 +1,7 @@
 /**
  * @fileoverview Component to display and manage a user's uploaded certificates.
+ * @author Mandar K.
+ * @date 2025-09-13
  * @description This component fetches the user's certificates from the backend,
  * displays them in a list with their current verification status, and provides
  * an option to delete each certificate.

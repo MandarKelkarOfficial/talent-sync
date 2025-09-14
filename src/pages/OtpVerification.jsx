@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 // src/pages/OtpVerification.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";

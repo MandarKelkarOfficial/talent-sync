@@ -5,6 +5,12 @@
  * for every outgoing request. This ensures all protected backend routes
  * can authenticate the user.
  */
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 import axios from 'axios';
 
 // Get the server URL from environment variables

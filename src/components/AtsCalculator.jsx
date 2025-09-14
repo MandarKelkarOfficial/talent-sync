@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 
 const MAX_JD_CHARS = 12000;

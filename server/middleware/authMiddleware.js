@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 // server/middleware/authMiddleware.js
 import jwt from 'jsonwebtoken';
 import StudentDetails from '../models/StudentDetails.js';

@@ -1,3 +1,10 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
+
 // controllers/aptitudeController.js
 import axios from 'axios';
 import AptitudeTest from '../models/AptitudeTest.js';
@@ -71,36 +78,6 @@ const generateQuestionPrompt = (topic, instructions, studentSkills = []) => {
     Do not include any text outside of the JSON array.
   `;
 };
-
-// Helper used by progress
-// const calculateTopicProgress = (results) => {
-//   if (!results || results.length < 2) return [];
-
-//   const latest = results[0];
-//   const previous = results[1];
-
-//   const topicProgress = [];
-
-//   latest.scoresByTopic.forEach(latestTopic => {
-//     const prevTopic = previous.scoresByTopic.find(p => p.topic === latestTopic.topic);
-//     if (prevTopic) {
-//       const latestPerc = latestTopic.total ? Math.round((latestTopic.score / latestTopic.total) * 100) : 0;
-//       const prevPerc = prevTopic.total ? Math.round((prevTopic.score / prevTopic.total) * 100) : 0;
-//       const improvement = latestPerc - prevPerc;
-
-//       topicProgress.push({
-//         topic: latestTopic.topic,
-//         current: latestPerc,
-//         previous: prevPerc,
-//         improvement,
-//         trend: improvement > 0 ? 'up' : improvement < 0 ? 'down' : 'stable'
-//       });
-//     }
-//   });
-
-//   return topicProgress.sort((a, b) => b.improvement - a.improvement);
-// };
-
 
 const calculateTopicProgress = (results) => {
   if (!results || results.length < 2) return [];
@@ -369,27 +346,6 @@ Based on the aptitude scores AND personality responses, generate detailed insigh
       const previous = results[1];
       const oldest = results[results.length - 1];
 
-      // const progressData = {
-      //   totalTests: results.length,
-      //   latestScore: latest.overallScore,
-      //   averageScore: Math.round(results.reduce((sum, r) => sum + r.overallScore, 0) / results.length),
-      //   bestScore: Math.max(...results.map(r => r.overallScore)),
-      //   worstScore: Math.min(...results.map(r => r.overallScore)),
-      //   recentTrend: previous ?
-      //     (latest.overallScore > previous.overallScore ? 'Improving' :
-      //       latest.overallScore < previous.overallScore ? 'Declining' : 'Stable') : 'First Test',
-      //   overallImprovement: oldest && results.length > 1 ?
-      //     Math.round((latest.overallScore - oldest.overallScore) * 10) / 10 : 0,
-      //   topicProgress: calculateTopicProgress(results),
-      //   timeline: results.slice().reverse().map(r => ({
-      //     date: r.completedAt,
-      //     score: r.overallScore,
-      //     topics: r.scoresByTopic.map(t => ({
-      //       topic: t.topic,
-      //       percentage: t.total ? Math.round((t.score / t.total) * 100) : 0
-      //     }))
-      //   }))
-      // };
 
       const progressData = {
         totalTests: results.length,

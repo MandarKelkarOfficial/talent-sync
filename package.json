@@ -1,7 +1,8 @@
 {
   "name": "talent-sync",
   "private": true,
-  "version": "0.0.0",
+  "author": "Mandar Kelkar",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",

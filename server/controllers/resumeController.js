@@ -1,10 +1,15 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
 
 
 import fs from 'fs';
 import path from 'path';
 import Resume from '../models/Resume.js';
 import axios from 'axios';
-import crypto from 'crypto'; // add at top of file with other imports
+import crypto from 'crypto'; 
 
 
 // --- Helper Functions ---
@@ -319,13 +324,7 @@ export const uploadResume = async (req, res) => {
             return res.status(400).json({ message: 'No file was uploaded.' });
         }
 
-        // console.log('Uploaded file details:', {
-        //     filename: req.file.filename,
-        //     originalname: req.file.originalname,
-        //     path: req.file.path,
-        //     mimetype: req.file.mimetype,
-        //     size: req.file.size
-        // });
+     
 
         const { studentId, title } = req.body;
         console.log('Request body:', { studentId, title });

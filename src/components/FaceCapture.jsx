@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 const FaceCapture = ({ onCapture, onClose, isOpen }) => {

@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 // controllers/authController.js
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";

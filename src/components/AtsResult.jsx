@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 import React from 'react';
 
 const AtsSummary = ({ summary, score, matchInfo, detailedInsights }) => {

@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 // File: src/components/LoginForm.jsx
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";

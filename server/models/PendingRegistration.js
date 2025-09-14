@@ -1,3 +1,9 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
 // models/PendingRegistration.js
 import mongoose from "mongoose";
 

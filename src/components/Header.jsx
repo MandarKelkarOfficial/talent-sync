@@ -1,3 +1,10 @@
+/**
+ *  @author Mandar K.
+ * @date 2025-09-13
+ * 
+ */
+
+
 // src/components/Header.jsx
 import React, { useRef, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
