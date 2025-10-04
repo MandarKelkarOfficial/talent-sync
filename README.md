@@ -124,6 +124,8 @@ talent-sync/
 ## ✍️ Author
 
   - **Mandar Kelkar**
+  - **Rutuja Patwari**
+  
 
 ## 📜 License
 
