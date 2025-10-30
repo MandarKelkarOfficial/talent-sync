@@ -1,3 +1,4 @@
+
 # # File: app/main.py
 
 # """
@@ -5,6 +6,7 @@
 
 # Author: Mandar . k
 # Date: 2024-10-10
+# Updated: 2025-09-14
 
 # This is the main entry point for the FastAPI application. It defines the API
 # endpoints for certificate verification and face analysis.
@@ -12,37 +14,30 @@
 # import uuid
 # from datetime import datetime
 # from typing import Optional, Dict, Any
+# import base64
 
-# from fastapi import FastAPI, File, UploadFile, Body, BackgroundTasks, Request, HTTPException, Header
+# from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Request, HTTPException, Header
 # from fastapi.middleware.cors import CORSMiddleware
+# from contextlib import asynccontextmanager
 
 # from app.core.config import settings
 # from app.models.schemas import VerifyRequest
 # from app.services import jobs, face_analysis
+# from app.utils import security
 
-# from contextlib import asynccontextmanager
-# from .core.config import settings
-# from .utils import security
-# import base64
-
-
-
-
-# # --- NEW: Lifespan event handler to initialize resources on startup ---
+# # --- Lifespan event handler to initialize resources on startup ---
 # @asynccontextmanager
 # async def lifespan(app: FastAPI):
-#     # Code to run on startup
+#     """Handles application startup and shutdown events."""
 #     print("🚀 Application startup...")
 #     try:
+#         # Decode the base64 key from settings and initialize the security module
 #         key_bytes = base64.b64decode(settings.AES_KEY_BASE64)
 #         security.initialize_aes_key(key_bytes)
 #     except Exception as e:
 #         print(f"❌ FATAL: Could not initialize AES key from .env: {e}")
-#         # In a real app, you might want to exit if the key is essential
 #     yield
-#     # Code to run on shutdown
 #     print("👋 Application shutdown.")
-
 
 
 # # --- FastAPI App Initialization ---
@@ -65,47 +60,32 @@
 # # --- API Endpoints ---
 # @app.post("/verify", status_code=202, response_model=Dict[str, str])
 # async def create_verification_job(
-#     request: Request,
 #     background_tasks: BackgroundTasks,
-#     file: Optional[UploadFile] = File(None),
-#     payload: Optional[VerifyRequest] = Body(None),
+#     file: UploadFile = File(...),
+#     metadata: str = Form(...), # <<< METADATA FIX: Now correctly expecting a 'metadata' form field.
 #     x_user: Optional[str] = Header(None, alias="X-User")
 # ):
 #     """
-#     Accepts a certificate for verification and queues it for background processing.
-
-#     This endpoint can handle:
-#     - **multipart/form-data**: With a `file` upload and an `X-User` header.
-#     - **application/json**: With a `url` or `verification_url` and `username`.
-#     - **Raw binary (e.g., application/pdf)**: With an `X-User` header.
-
-#     It immediately returns a `jobId` that can be used to poll the status.
+#     Accepts a certificate for verification via multipart/form-data and queues it for background processing.
+#     The Node.js server sends the file and a 'metadata' field containing a JSON string.
 #     """
 #     job_id = uuid.uuid4().hex
-#     userid = x_user.strip() if x_user else (payload.username.strip() if payload and payload.username else "default_user")
+    
+#     # The 'userid' here is the student's name from the header, used for name validation.
+#     # The actual studentId ObjectId is inside the metadata string.
+#     userid = x_user.strip() if x_user else "default_user"
 
 #     job_data: Dict[str, Any] = {
 #         "jobId": job_id,
 #         "userid": userid,
 #         "createdAt": datetime.utcnow().isoformat(),
 #         "status": "queued",
+#         "source": "upload",
+#         "filename": file.filename,
+#         "content_type": file.content_type,
+#         "raw_bytes": await file.read(),
+#         "metadata": metadata  # Pass the received metadata string directly to the job.
 #     }
-
-#     if file:
-#         job_data.update({
-#             "source": "upload",
-#             "filename": file.filename,
-#             "content_type": file.content_type,
-#             "raw_bytes": await file.read(),
-#         })
-#     elif payload and (payload.url or payload.verification_url):
-#         job_data.update({
-#             "source": "url" if payload.url else "verify_page",
-#             "url": payload.url,
-#             "verification_url": payload.verification_url,
-#         })
-#     else:
-#         raise HTTPException(status_code=400, detail="Request must contain a file upload or a valid URL in the JSON payload.")
 
 #     jobs.JOBS[job_id] = job_data
 #     background_tasks.add_task(jobs.process_and_forward, job_id)
@@ -117,8 +97,6 @@
 # async def get_verification_status(job_id: str):
 #     """
 #     Retrieves the status and result of a verification job.
-
-#     Poll this endpoint using the `jobId` returned from the `/verify` POST request.
 #     """
 #     job = jobs.get_job_status(job_id)
 #     if not job:
@@ -129,13 +107,7 @@
 # @app.post("/analyze-face", response_model=Dict[str, Any])
 # async def analyze_face_endpoint(file: UploadFile = File(...)):
 #     """
-#     Analyzes an uploaded image to assess its suitability as a profile picture for verification.
-
-#     Checks for:
-#     - Presence of a single face.
-#     - Image quality and face framing.
-
-#     Returns an `acceptable` boolean flag and a list of recommendations.
+#     Analyzes an uploaded image to assess its suitability as a profile picture.
 #     """
 #     try:
 #         file_bytes = await file.read()
@@ -166,6 +138,9 @@
 #     return {"status": "ok", "downstream_endpoint": settings.SERVER_ENDPOINT}
 
 
+
+
+
 # File: app/main.py
 
 """
@@ -173,7 +148,7 @@ CertProcessor Microservice (FastAPI)
 
 Author: Mandar . k
 Date: 2024-10-10
-Updated: 2025-09-14
+Updated: 2025-09-15
 
 This is the main entry point for the FastAPI application. It defines the API
 endpoints for certificate verification and face analysis.
@@ -182,14 +157,14 @@ import uuid
 from datetime import datetime
 from typing import Optional, Dict, Any
 import base64
+import asyncio
 
 from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
-from app.models.schemas import VerifyRequest
-from app.services import jobs, face_analysis
+from app.services import jobs, face_analysis, model_loader # <-- IMPORT NEW SERVICE
 from app.utils import security
 
 # --- Lifespan event handler to initialize resources on startup ---
@@ -198,13 +173,21 @@ async def lifespan(app: FastAPI):
     """Handles application startup and shutdown events."""
     print("🚀 Application startup...")
     try:
-        # Decode the base64 key from settings and initialize the security module
         key_bytes = base64.b64decode(settings.AES_KEY_BASE64)
         security.initialize_aes_key(key_bytes)
     except Exception as e:
         print(f"❌ FATAL: Could not initialize AES key from .env: {e}")
+    
+    # --- START MODEL WARMER ---
+    # Create a background task that runs the warm_up_models function.
+    warmup_task = asyncio.create_task(model_loader.warm_up_models())
+    
     yield
-    print("👋 Application shutdown.")
+    
+    # --- CLEANUP ON SHUTDOWN ---
+    print("👋 Application shutdown. Stopping model warmer...")
+    warmup_task.cancel()
+    print("Model warmer stopped.")
 
 
 # --- FastAPI App Initialization ---
@@ -217,7 +200,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to specific domains
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -225,21 +208,27 @@ app.add_middleware(
 
 
 # --- API Endpoints ---
+
+# --- NEW ENDPOINT to check model status ---
+@app.get("/model-status", response_model=Dict[str, Any])
+async def get_model_status():
+    """
+    Returns the current operational status of the Hugging Face OCR models.
+    """
+    return model_loader.get_models_status()
+
+
 @app.post("/verify", status_code=202, response_model=Dict[str, str])
 async def create_verification_job(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    metadata: str = Form(...), # <<< METADATA FIX: Now correctly expecting a 'metadata' form field.
+    metadata: str = Form(...),
     x_user: Optional[str] = Header(None, alias="X-User")
 ):
     """
-    Accepts a certificate for verification via multipart/form-data and queues it for background processing.
-    The Node.js server sends the file and a 'metadata' field containing a JSON string.
+    Accepts a certificate for verification and queues it for background processing.
     """
     job_id = uuid.uuid4().hex
-    
-    # The 'userid' here is the student's name from the header, used for name validation.
-    # The actual studentId ObjectId is inside the metadata string.
     userid = x_user.strip() if x_user else "default_user"
 
     job_data: Dict[str, Any] = {
@@ -251,7 +240,7 @@ async def create_verification_job(
         "filename": file.filename,
         "content_type": file.content_type,
         "raw_bytes": await file.read(),
-        "metadata": metadata  # Pass the received metadata string directly to the job.
+        "metadata": metadata
     }
 
     jobs.JOBS[job_id] = job_data
@@ -286,7 +275,7 @@ async def analyze_face_endpoint(file: UploadFile = File(...)):
         is_acceptable = (
             analysis_result.get("face_detected") and
             analysis_result.get("face_count") == 1 and
-            analysis_result.get("quality_score", 0.0) >= 0.5
+            analysis_get("quality_score", 0.0) >= 0.5
         )
         
         return {
