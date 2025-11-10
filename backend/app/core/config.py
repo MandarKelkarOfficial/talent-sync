@@ -4,6 +4,7 @@
 Configuration Management
 Author: Mandar . k
 Date: 2024-10-10
+Updated: 2025-11-02
 
 This module handles the loading and validation of environment variables
 for the application using Pydantic's BaseSettings.
@@ -12,20 +13,45 @@ for the application using Pydantic's BaseSettings.
 import os
 import base64
 from pydantic import BaseSettings, validator
+import logging
+
+# Configure logging
+log = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
+    Reads from a .env file in the same directory.
     """
-    SERVER_ENDPOINT: str = "http://localhost:5000/api/certificates"
+    
+    # URL for the Node.js server's webhook
+    SERVER_ENDPOINT: str = "http://localhost:5000/api/certificates/save-result"
+    
+    # Base64 encoded 32-byte (AES-256) key for encrypting files
     AES_KEY_BASE64: str
-    HUGGINGFACE_API_KEY: str
+    
+    # API Key for Google Gemini
+    GEMINI_API_KEY: str
+    
+    # Directory to store encrypted certificate files
     UPLOAD_DIR: str = "./encrypted_uploads"
-    POST_TIMEOUT_SECONDS: int = 30
+    
+    # --- Timeouts and Retries ---
+    # Timeout for generic network requests (like Gemini)
+    POST_TIMEOUT_SECONDS: int = 60
+    # Timeout for the Playwright headless browser (needs to be longer)
+    PLAYWRIGHT_TIMEOUT: int = 120  # 2 minutes
+    # Retries for posting the final result back to the Node.js server
     POST_RETRIES: int = 3
+    
+    # (Optional) Path to Tesseract executable if needed by OCR
     TESSERACT_CMD: str | None = None
 
-    AES_KEY: bytes | None = None  # Will be derived from AES_KEY_BASE64
+    # (Deprecated) Kept here so Pydantic doesn't fail if it's still in .env
+    HUGGINGFACE_API_KEY: str | None = None
+
+    # This field will be populated by the validator
+    AES_KEY: bytes | None = None
 
     @validator("AES_KEY_BASE64")
     def validate_aes_key(cls, v: str) -> str:
@@ -41,13 +67,26 @@ class Settings(BaseSettings):
             return v
         except Exception as e:
             raise ValueError(f"AES_KEY_BASE64 is not valid: {e}") from e
+        
+    @validator("GEMINI_API_KEY")
+    def validate_gemini_key(cls, v: str) -> str:
+        """Validates that the Gemini API key is set."""
+        if not v or len(v) < 30: # Basic check
+            log.warning("GEMINI_API_KEY is not set or looks invalid. Verification will fail.")
+            raise ValueError("GEMINI_API_KEY must be set in .env and be a valid key.")
+        return v
 
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
 
 # Create a single settings instance to be used across the application
-settings = Settings()
+try:
+    settings = Settings()
+    # Ensure the upload directory exists
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+except ValueError as e:
+    log.critical(f"FATAL ERROR: Could not load settings from .env file. {e}")
+    # Exit or raise if in a context that can't start
+    raise
 
-# Ensure the upload directory exists
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

@@ -5,7 +5,7 @@ Pydantic Schemas
 Author: Mandar . k
 Date: 2024-10-10
 
-This module defines the Pydantic models used for API request and response validation.
+This module defines the Pydantic models used for API request/response validation.
 """
 
 from pydantic import BaseModel
@@ -13,8 +13,9 @@ from typing import Optional
 
 class VerifyRequest(BaseModel):
     """
-    Defines the shape of a JSON payload for the /verify endpoint.
+    DEPRECATED: This was for a different flow.
+    The /verify endpoint now uses multipart/form-data (File + Form).
     """
-    url: Optional[str] = None          # Direct file URL (pdf/png/jpg)
-    verification_url: Optional[str] = None # Issuer verification page (e.g., Coursera verify link)
-    username: Optional[str] = None     # Authenticated username for matching
+    url: Optional[str] = None
+    verification_url: Optional[str] = None
+    username: Optional[str] = None

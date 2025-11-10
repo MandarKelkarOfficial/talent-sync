@@ -1,234 +1,230 @@
 # File: app/services/verification.py
 
-# """
-# External Verification Service
-
-# Author: Mandar . k
-# Date: 2024-10-10
-
-# This module contains functions for performing verifications that require
-# external network calls, such as checking QR code links, parsing verification
-# pages, and posting the final results to a downstream server.
-# """
-# import httpx
-# import asyncio
-# import re
-# from typing import List, Dict, Any, Optional
-# from bs4 import BeautifulSoup
-# from app.core.config import settings
-
-# async def verify_verification_page(page_url: str, expected_username: Optional[str]) -> Dict[str, Any]:
-#     """
-#     Scrapes and analyzes a verification URL (e.g., from Coursera) for evidence.
-
-#     :param page_url: The URL of the verification page to check.
-#     :param expected_username: The name of the user to look for on the page.
-#     :return: A dictionary with the verification result.
-#     """
-#     evidence: Dict[str, Any] = {"url": page_url}
-#     try:
-#         async with httpx.AsyncClient(timeout=settings.POST_TIMEOUT_SECONDS, follow_redirects=True) as client:
-#             r = await client.get(page_url)
-#             if r.status_code != 200:
-#                 evidence["status_code"] = r.status_code
-#                 return {"ok": False, "score": 0.0, "methods": [], "evidence": evidence}
-
-#             soup = BeautifulSoup(r.text, "html.parser")
-#             page_text_low = soup.get_text(separator=" ").lower()
-
-#             # --- Heuristics ---
-#             keywords = ["verify", "verified", "certificate", "credential", "valid"]
-#             has_keywords = any(k in page_text_low for k in keywords)
-#             matched_name = False
-#             if expected_username:
-#                 simple_name = expected_username.strip().lower()
-#                 matched_name = simple_name and simple_name in page_text_low
-            
-#             score, methods = 0.0, []
-#             if has_keywords:
-#                 score += 0.50
-#                 methods.append("verification-page-keywords")
-#             if matched_name:
-#                 score += 0.50
-#                 methods.append("name-on-verification-page")
-
-#             evidence.update({
-#                 "status_code": r.status_code,
-#                 "matched_name": matched_name,
-#                 "has_keywords": has_keywords,
-#                 "text_snippet": page_text_low[:800]
-#             })
-
-#             return {"ok": score >= 0.5, "score": min(score, 1.0), "methods": methods, "evidence": evidence}
-#     except Exception as e:
-#         return {"ok": False, "score": 0.0, "methods": [], "evidence": {"error": str(e), "url": page_url}}
-
-
-# async def verify_via_qr_or_link(qr_urls: List[str], extracted_text: str) -> Dict[str, Any]:
-#     """
-#     Iterates through QR code URLs and checks them for verification evidence.
-
-#     :param qr_urls: A list of URLs found in QR codes.
-#     :param extracted_text: The text extracted from the certificate file.
-#     :return: A dictionary with the best verification result found.
-#     """
-#     for url in qr_urls:
-#         if not (url.startswith("http://") or url.startswith("https://")):
-#             continue
-#         # For simplicity, we can reuse the more robust verification page logic
-#         result = await verify_verification_page(url, extracted_text)
-#         if result.get("ok"):
-#             return result # Return the first successful verification
-            
-#     return {"ok": False, "score": 0.0, "methods": [], "evidence": None}
-
-
-# async def post_to_server(payload: Dict[str, Any]) -> Dict[str, Any]:
-#     """
-#     Posts the final processed payload to the configured server endpoint with retries.
-
-#     :param payload: The JSON payload to send.
-#     :return: A dictionary indicating the outcome of the POST request.
-#     """
-#     async with httpx.AsyncClient(timeout=settings.POST_TIMEOUT_SECONDS) as client:
-#         last_exc = None
-#         for attempt in range(settings.POST_RETRIES):
-#             try:
-#                 r = await client.post(settings.SERVER_ENDPOINT, json=payload, timeout=settings.POST_TIMEOUT_SECONDS)
-#                 r.raise_for_status() # Raise exception for 4xx/5xx responses
-#                 return {"ok": True, "status_code": r.status_code, "response_text": r.text}
-#             except Exception as e:
-#                 last_exc = e
-#                 await asyncio.sleep(1) # Wait before retrying
-#     return {"ok": False, "error": str(last_exc)}
-
-
-# File: app/services/verification.py
-
 """
 External Verification Service
 
 Author: Mandar . k
-Date: 2024-10-10
-Updated: 2025-09-14
+Date: 2025-11-02
 
-This module contains functions for performing verifications that require
-external network calls, such as checking QR code links, parsing verification
-pages, and posting the final results to a downstream server.
+This module handles all external network calls:
+1.  Specialized API crawlers for known providers (Wadhwani, Coursera).
+2.  A generic Playwright-based crawler for unknown, JS-heavy sites.
+3.  Posting the final result back to the Node.js server.
 """
 import httpx
 import asyncio
 import re
-from typing import List, Dict, Any, Optional
+import logging
+from typing import Dict, Any, Optional
 from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright, Playwright, Browser, Page
 from app.core.config import settings
 
-async def verify_verification_page(page_url: str, expected_username: Optional[str]) -> Dict[str, Any]:
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
+
+# --- Playwright Global Instance ---
+# We use a global instance to avoid the high cost of starting/stopping
+# the browser process for every single request.
+_playwright: Optional[Playwright] = None
+_playwright_browser: Optional[Browser] = None
+
+async def start_playwright():
+    """Starts the global Playwright instance and launches a browser."""
+    global _playwright, _playwright_browser
+    if _playwright is None:
+        log.info("Initializing Playwright...")
+        _playwright = await async_playwright().start()
+        _playwright_browser = await _playwright.chromium.launch(headless=True)
+        log.info("Playwright browser launched.")
+
+async def stop_playwright():
+    """Stops the global Playwright browser and instance."""
+    global _playwright, _playwright_browser
+    if _playwright_browser:
+        await _playwright_browser.close()
+        _playwright_browser = None
+    if _playwright:
+        await _playwright.stop()
+        _playwright = None
+    log.info("Playwright stopped.")
+
+async def get_playwright_browser() -> Browser:
+    """Returns the global browser, starting it if necessary."""
+    if _playwright_browser is None:
+        log.warning("Playwright not started, starting on-demand.")
+        await start_playwright()
+    return _playwright_browser
+
+# --- Provider-Specific Crawlers ---
+
+async def crawl_wadhwani_foundation_api(page_url: str) -> Optional[str]:
     """
-    Scrapes and analyzes a verification URL (e.g., from a QR code) for evidence of validity.
-
-    This function visits the given URL, extracts its text content, and then applies
-    a series of checks to determine if the page validates the certificate.
-
-    Args:
-        page_url: The URL of the verification page to check.
-        expected_username: The name of the user to look for on the page.
-
-    Returns:
-        A dictionary containing the verification result, including a boolean `ok` flag,
-        a confidence `score`, and the `evidence` found.
+    Specific handler for Wadhwani Foundation.
+    It calls their public API directly instead of scraping the JS-based page.
     """
-    evidence: Dict[str, Any] = {"url": page_url, "status_code": None, "matched_name": False, "has_keywords": False}
+    log.info(f"Detected Wadhwani Foundation URL. Attempting direct API call.")
     try:
-        async with httpx.AsyncClient(timeout=settings.POST_TIMEOUT_SECONDS, follow_redirects=True) as client:
-            r = await client.get(page_url)
-            evidence["status_code"] = r.status_code
-            r.raise_for_status() # Raise an exception for non-2xx status codes
-
-            soup = BeautifulSoup(r.text, "html.parser")
-            page_text_low = soup.get_text(separator=" ").lower()
-            evidence["text_snippet"] = page_text_low[:800]
-
-            # --- Heuristic Checks ---
-            score = 0.0
-            methods = []
-
-            # 1. Check for verification-related keywords
-            keywords = ["verify", "verified", "certificate", "credential", "valid", "issued to", "completed"]
-            if any(k in page_text_low for k in keywords):
-                score += 0.50
-                methods.append("verification-page-keywords")
-                evidence["has_keywords"] = True
-
-            # 2. Check for the user's name on the page
-            if expected_username:
-                # Normalize and split the name to check for partial matches (e.g., first and last name)
-                name_tokens = [token for token in re.split(r'\W+', expected_username.lower()) if len(token) > 2]
-                matches = sum(1 for token in name_tokens if token in page_text_low)
-                
-                # Require at least two name parts to match for a confident result
-                if matches >= 2:
-                    score += 0.50
-                    methods.append("name-on-verification-page")
-                    evidence["matched_name"] = True
-
-            return {"ok": score >= 0.75, "score": min(score, 1.0), "methods": methods, "evidence": evidence}
-
-    except httpx.RequestError as e:
-        evidence["error"] = f"Network error fetching URL: {str(e)}"
-        return {"ok": False, "score": 0.0, "methods": [], "evidence": evidence}
-    except Exception as e:
-        evidence["error"] = f"An unexpected error occurred during page verification: {str(e)}"
-        return {"ok": False, "score": 0.0, "methods": [], "evidence": evidence}
-
-
-async def verify_via_qr_or_link(qr_urls: List[str], extracted_text: str, student_name: str) -> Dict[str, Any]:
-    """
-    Iterates through QR code URLs and uses the most reliable one for verification.
-
-    Args:
-        qr_urls: A list of URLs found in QR codes.
-        extracted_text: The text extracted from the certificate file (used as a fallback for name matching).
-        student_name: The name of the student for validation.
-
-    Returns:
-        A dictionary with the best verification result found.
-    """
-    if not qr_urls:
-        return {"ok": False, "score": 0.0, "methods": [], "evidence": None}
-
-    # Attempt to verify each URL found and return the first successful one
-    for url in qr_urls:
-        if not (url.startswith("http://") or url.startswith("https://")):
-            continue
+        match = re.search(r'certificateId=([a-f0-9]+)', page_url)
+        if not match:
+            log.warning("Wadhwani URL: Could not parse certificateId.")
+            return None
         
-        # Pass the student's name for a more reliable check
-        result = await verify_verification_page(url, student_name or extracted_text)
-        if result.get("ok"):
-            return result
+        certificate_id = match.group(1)
+        api_url = "https://l2-cen.wadhwanifoundation.org/api/v1/PublicCertificate/GetCertificate"
+        payload = {"certificateId": certificate_id}
+        
+        async with httpx.AsyncClient(timeout=settings.POST_TIMEOUT_SECONDS, follow_redirects=True) as client:
+            r = await client.post(api_url, json=payload)
+            r.raise_for_status()
+            response_json = r.json()
             
-    # If no URL yields a positive verification, return a default failure response
-    return {"ok": False, "score": 0.0, "methods": [], "evidence": {"checked_urls": qr_urls}}
+            if response_json.get("success") and response_json.get("data"):
+                data = response_json["data"]
+                # Convert the structured JSON into a simple text string for Gemini
+                text_blob = f"""
+                Certificate Provider: Wadhwani Foundation
+                Student Name: {data.get("studentName")}
+                Course Name: {data.get("courseName")}
+                Issued On: {data.get("issueDate")}
+                Status: {data.get("status")}
+                """
+                log.info(f"--- CRAWLED TEXT (from Wadhwani API) --- \n{text_blob}\n--- END CRAWLED TEXT ---")
+                return text_blob
+            else:
+                log.warning(f"Wadhwani API call succeeded but returned no data.")
+                return None
+    except Exception as e:
+        log.error(f"Wadhwani API call failed: {e}", exc_info=True)
+        return None
 
+async def crawl_coursera_api(page_url: str) -> Optional[str]:
+    """
+    Specific handler for Coursera. Calls their public verification API.
+    """
+    log.info(f"Detected Coursera URL. Attempting direct API call.")
+    try:
+        match = re.search(r'verify/([A-Z0-9]+)', page_url)
+        if not match:
+            log.warning("Coursera URL: Could not parse certificateId.")
+            return None
+        
+        certificate_id = match.group(1)
+        api_url = f"https://api.coursera.org/api/certificate.v1/verification/{certificate_id}"
+        
+        async with httpx.AsyncClient(timeout=settings.POST_TIMEOUT_SECONDS, follow_redirects=True) as client:
+            headers = {'User-Agent': 'TalentSync-Verification-Bot/1.0'}
+            r = await client.get(api_url, headers=headers)
+            r.raise_for_status()
+            response_json = r.json()
+            
+            if response_json.get("elements") and len(response_json["elements"]) > 0:
+                data = response_json["elements"][0]
+                text_blob = f"""
+                Certificate Provider: Coursera
+                Recipient Name: {data.get("recipientName")}
+                Course Name: {data.get("courseName")}
+                Issued On: {data.get("issuedOn")}
+                University: {data.get("universityName")}
+                """
+                log.info(f"--- CRAWLED TEXT (from Coursera API) --- \n{text_blob}\n--- END CRAWLED TEXT ---")
+                return text_blob
+            else:
+                log.warning(f"Coursera API call succeeded but returned no data.")
+                return None
+    except Exception as e:
+        log.error(f"Coursera API call failed: {e}", exc_info=True)
+        return None
+
+# --- Generic Fallback Crawler (Playwright) ---
+
+async def crawl_with_playwright(page_url: str) -> Optional[str]:
+    """
+    Generic fallback crawler.
+    Uses a headless browser (Playwright) to load the page, wait for
+    JavaScript to render, and then extract the text content.
+    """
+    log.info(f"Attempting to crawl URL with Playwright (generic fallback): {page_url}")
+    page: Optional[Page] = None
+    try:
+        browser = await get_playwright_browser()
+        page = await browser.new_page(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        )
+        
+        # Go to the page with a generous timeout
+        await page.goto(page_url, timeout=settings.PLAYWRIGHT_TIMEOUT * 1000)
+        
+        # Wait for 3 seconds to allow JS to load and render
+        await page.wait_for_timeout(3000) 
+        
+        # Get the fully rendered HTML
+        html_content = await page.content()
+        
+        # Use BeautifulSoup to parse the rendered HTML and strip text
+        soup = BeautifulSoup(html_content, "html.parser")
+        for script_or_style in soup(["script", "style", "nav", "footer", "header"]):
+            script_or_style.decompose()
+        
+        page_text = soup.get_text(separator=" ", strip=True)
+        
+        log.info(f"Successfully crawled {len(page_text)} chars from {page_url} (Playwright).")
+        log.info(f"--- CRAWLED TEXT (Playwright) --- \n{page_text[:1000]}...\n--- END CRAWLED TEXT ---")
+        return page_text
+
+    except Exception as e:
+        log.error(f"Playwright crawl failed for {page_url}: {e}", exc_info=True)
+        return None
+    finally:
+        if page:
+            await page.close()
+
+# --- Main Router Function ---
+
+async def crawl_page_text(page_url: str) -> Optional[str]:
+    """
+    Crawls a verification URL.
+    It uses specific API handlers if available (Provider Router),
+    otherwise falls back to the Playwright headless browser.
+    """
+    
+    # --- Provider Router ---
+    if "web.certificate.wfglobal.org" in page_url:
+        return await crawl_wadhwani_foundation_api(page_url)
+    
+    if "coursera.org/account/accomplishments/verify" in page_url:
+        return await crawl_coursera_api(page_url)
+    
+    # ... we can add more handlers here for Credly, Accredible, etc. ...
+    
+    # --- END Provider Router ---
+
+    # --- Generic Fallback Crawler (Playwright) ---
+    # If no specific handler matched, use the headless browser.
+    return await crawl_with_playwright(page_url)
+
+
+# --- Postback Function ---
 
 async def post_to_server(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Posts the final processed payload to the configured server endpoint with retries.
-
-    Args:
-        payload: The JSON payload to send.
-
-    Returns:
-        A dictionary indicating the outcome of the POST request.
     """
+    log.info(f"Posting final payload for job {payload.get('jobId')} to {settings.SERVER_ENDPOINT}")
     async with httpx.AsyncClient(timeout=settings.POST_TIMEOUT_SECONDS) as client:
         last_exc = None
         for attempt in range(settings.POST_RETRIES):
             try:
                 r = await client.post(settings.SERVER_ENDPOINT, json=payload, timeout=settings.POST_TIMEOUT_SECONDS)
                 r.raise_for_status()
+                log.info(f"Successfully posted job {payload.get('jobId')}, server responded with {r.status_code}.")
                 return {"ok": True, "status_code": r.status_code, "response_text": r.text}
             except Exception as e:
                 last_exc = e
+                log.warning(f"Post to server failed (attempt {attempt + 1}/{settings.POST_RETRIES}). Retrying in 1s... Error: {e}")
                 await asyncio.sleep(1) # Wait 1 second before retrying
+                
+    log.error(f"Failed to post job {payload.get('jobId')} after {settings.POST_RETRIES} attempts. Last error: {last_exc}")
     return {"ok": False, "error": str(last_exc)}
+
