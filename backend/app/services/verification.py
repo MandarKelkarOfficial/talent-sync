@@ -190,8 +190,7 @@ async def crawl_page_text(page_url: str) -> Optional[str]:
     """
     
     # --- Provider Router ---
-    if "web.certificate.wfglobal.org" in page_url:
-        return await crawl_wadhwani_foundation_api(page_url)
+
     
     if "coursera.org/account/accomplishments/verify" in page_url:
         return await crawl_coursera_api(page_url)

@@ -2,13 +2,7 @@
 
 """
 CertProcessor Microservice (FastAPI)
-
-Author: Mandar . k
-Date: 2024-10-10
-Updated: 2025-10-30
-
-This is the main entry point for the FastAPI application. It defines the API
-endpoints for certificate verification and face analysis.
+...
 """
 import uuid
 from datetime import datetime
@@ -16,6 +10,18 @@ from typing import Optional, Dict, Any
 import base64
 import asyncio
 import logging
+import sys  
+
+# --- UPDATED BLOCK TO FIX PLAYWRIGHT ON WINDOWS ---
+if sys.platform == "win32":
+    # This is a more forceful fix. Instead of setting the *policy*,
+    # we are *manually creating* the correct loop type (SelectorEventLoop)
+    # and setting it as the default for the main thread.
+    # This must run before FastAPI/Uvicorn create their own.
+    loop = asyncio.SelectorEventLoop()
+    asyncio.set_event_loop(loop)
+# -----------------------------------------------------
+
 
 from fastapi import FastAPI, File, UploadFile, Form, BackgroundTasks, Request, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,10 +30,13 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.services import jobs, face_analysis
 from app.utils import security
+from app.services import verification # This import is needed for the lifespan
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
+
+
 
 # --- Lifespan event handler to initialize resources on startup ---
 @asynccontextmanager
@@ -40,10 +49,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.critical(f"❌ FATAL: Could not initialize AES key from .env: {e}")
     
+    # --- FIX: START PLAYWRIGHT ON BOOT ---
+    # This is the change that was missing from your file.
+    # We start Playwright here to make sure it uses the correct
+    # asyncio event loop policy set above.
+    log.info("Starting Playwright service...")
+    await verification.start_playwright()
+    # ----------------------------------------
+    
     yield
     
     # --- CLEANUP ON SHUTDOWN ---
-    log.info("👋 Application shutdown.")
+    # --- FIX: STOP PLAYWRIGHT ON SHUTDOWN ---
+    log.info("👋 Application shutdown. Stopping Playwright service...")
+    await verification.stop_playwright()
+    log.info("Playwright service stopped.")
+    # -------------------------------------
 
 
 # --- FastAPI App Initialization ---

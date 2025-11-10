@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     
     # --- Timeouts and Retries ---
     # Timeout for generic network requests (like Gemini)
-    POST_TIMEOUT_SECONDS: int = 60
+    POST_TIMEOUT_SECONDS: int = 120
     # Timeout for the Playwright headless browser (needs to be longer)
     PLAYWRIGHT_TIMEOUT: int = 120  # 2 minutes
     # Retries for posting the final result back to the Node.js server
