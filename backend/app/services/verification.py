@@ -118,10 +118,35 @@ pages, and posting the final results to a downstream server.
 """
 import httpx
 import asyncio
+import logging
 import re
 from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 from app.core.config import settings
+
+logger = logging.getLogger("app.services.verification")
+logging.basicConfig(level=logging.INFO)
+
+
+def _extract_token_from_url(url: str) -> Optional[str]:
+    """Extract a candidate token from a URL's path or query.
+
+    Returns an alphanumeric token of length >=6 and <=64 if found, otherwise None.
+    """
+    try:
+        # Strip protocol
+        path = re.sub(r"^https?://", "", url)
+        # Remove domain
+        path = path.split("/", 1)[-1]
+        # Search for long alphanumeric tokens in path or query
+        candidates = re.findall(r"[A-Za-z0-9_-]{6,64}", path)
+        if candidates:
+            # prefer the longest candidate
+            candidates.sort(key=len, reverse=True)
+            return candidates[0]
+    except Exception:
+        return None
+    return None
 
 async def verify_verification_page(page_url: str, expected_username: Optional[str]) -> Dict[str, Any]:
     """
@@ -140,14 +165,28 @@ async def verify_verification_page(page_url: str, expected_username: Optional[st
     """
     evidence: Dict[str, Any] = {"url": page_url, "status_code": None, "matched_name": False, "has_keywords": False}
     try:
+        # Use a conservative per-request timeout so a single slow verification URL
+        # doesn't block the whole flow. Use min(settings.POST_TIMEOUT_SECONDS, 6).
+        per_request_timeout = min(max(3, settings.POST_TIMEOUT_SECONDS), 6)
         async with httpx.AsyncClient(timeout=settings.POST_TIMEOUT_SECONDS, follow_redirects=True) as client:
-            r = await client.get(page_url)
+            r = await client.get(page_url, timeout=per_request_timeout)
             evidence["status_code"] = r.status_code
             r.raise_for_status() # Raise an exception for non-2xx status codes
 
             soup = BeautifulSoup(r.text, "html.parser")
             page_text_low = soup.get_text(separator=" ").lower()
             evidence["text_snippet"] = page_text_low[:800]
+
+            # Fast-path: if the page includes a unique token that was embedded in the QR
+            # (for example a certificate id/hash), treat that as strong evidence.
+            # We try to extract a token-looking string from the URL and check for it.
+            potential_token = _extract_token_from_url(page_url)
+            if potential_token and potential_token in page_text_low:
+                score = 1.0
+                methods = ["token-on-page"]
+                evidence["token_found"] = potential_token
+                logger.info("verify_verification_page: token %s found on page %s", potential_token, page_url)
+                return {"ok": True, "score": score, "methods": methods, "evidence": evidence}
 
             # --- Heuristic Checks ---
             score = 0.0
@@ -172,6 +211,7 @@ async def verify_verification_page(page_url: str, expected_username: Optional[st
                     methods.append("name-on-verification-page")
                     evidence["matched_name"] = True
 
+            logger.info("verify_verification_page: %s -> score=%.2f methods=%s", page_url, min(score,1.0), methods)
             return {"ok": score >= 0.75, "score": min(score, 1.0), "methods": methods, "evidence": evidence}
 
     except httpx.RequestError as e:
@@ -197,18 +237,70 @@ async def verify_via_qr_or_link(qr_urls: List[str], extracted_text: str, student
     if not qr_urls:
         return {"ok": False, "score": 0.0, "methods": [], "evidence": None}
 
-    # Attempt to verify each URL found and return the first successful one
+    # Filter and dedupe URLs quickly
+    valid_urls = []
+    seen = set()
     for url in qr_urls:
         if not (url.startswith("http://") or url.startswith("https://")):
             continue
-        
-        # Pass the student's name for a more reliable check
-        result = await verify_verification_page(url, student_name or extracted_text)
-        if result.get("ok"):
-            return result
-            
-    # If no URL yields a positive verification, return a default failure response
-    return {"ok": False, "score": 0.0, "methods": [], "evidence": {"checked_urls": qr_urls}}
+        if url in seen:
+            continue
+        seen.add(url)
+        valid_urls.append(url)
+
+    if not valid_urls:
+        return {"ok": False, "score": 0.0, "methods": [], "evidence": {"checked_urls": qr_urls}}
+
+    logger.info("verify_via_qr_or_link: checking %d URLs", len(valid_urls))
+
+    # First, attempt a very fast token-based verification synchronously per-URL.
+    for u in valid_urls:
+        token = _extract_token_from_url(u)
+        if token:
+            # Try a short GET and search for the token in the body or JSON
+            try:
+                per_request_timeout = min(max(2, settings.POST_TIMEOUT_SECONDS), 4)
+                async with httpx.AsyncClient(timeout=per_request_timeout, follow_redirects=True) as client:
+                    r = await client.get(u, timeout=per_request_timeout)
+                    # If JSON and token present
+                    try:
+                        data = r.json()
+                        body = str(data).lower()
+                    except Exception:
+                        body = r.text.lower()
+                    if token.lower() in body:
+                        logger.info("verify_via_qr_or_link: token match found immediately for %s", u)
+                        return {"ok": True, "score": 1.0, "methods": ["token-direct-match"], "evidence": {"url": u, "token": token}}
+            except Exception as e:
+                logger.info("quick token check failed for %s: %s", u, e)
+
+    # Run verification tasks concurrently and return the first positive result.
+    tasks = [asyncio.create_task(verify_verification_page(u, student_name or extracted_text)) for u in valid_urls]
+    try:
+        # Iterate as tasks finish; overall timeout is settings.POST_TIMEOUT_SECONDS
+        for fut in asyncio.as_completed(tasks, timeout=settings.POST_TIMEOUT_SECONDS):
+            try:
+                result = await fut
+            except Exception as e:
+                logger.info("verification task failed: %s", e)
+                continue
+            if result.get("ok"):
+                # cancel remaining tasks
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
+                logger.info("verify_via_qr_or_link: success from a URL; score=%.2f", result.get("score", 0.0))
+                return result
+    except asyncio.TimeoutError:
+        logger.info("verify_via_qr_or_link: timeout after %s seconds", settings.POST_TIMEOUT_SECONDS)
+    finally:
+        # Ensure all tasks are cleaned up
+        for t in tasks:
+            if not t.done():
+                t.cancel()
+
+    # No success
+    return {"ok": False, "score": 0.0, "methods": [], "evidence": {"checked_urls": valid_urls}}
 
 
 async def post_to_server(payload: Dict[str, Any]) -> Dict[str, Any]:

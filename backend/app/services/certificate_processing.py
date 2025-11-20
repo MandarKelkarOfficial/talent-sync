@@ -153,8 +153,18 @@ import io
 import re
 from typing import List, Dict, Optional, Any
 from PIL import Image
-from pyzbar.pyzbar import decode as qr_decode
 from pdf2image import convert_from_bytes
+
+# Import pyzbar lazily and handle missing native lib (libzbar). If the native
+# library is not available (common on Windows without additional installation),
+# we degrade gracefully: QR scanning will just return an empty list instead of
+# crashing the application at import time.
+try:
+    from pyzbar.pyzbar import decode as qr_decode  # type: ignore
+    _PYZBAR_AVAILABLE = True
+except Exception:
+    qr_decode = None  # type: ignore
+    _PYZBAR_AVAILABLE = False
 
 # --- Constants ---
 # Expanded list of known issuers to improve detection
@@ -190,6 +200,9 @@ def get_image_from_bytes(file_bytes: bytes, content_type: str) -> Optional[Image
 
 def scan_qr_from_image(pil_img: Image.Image) -> List[str]:
     """Scans a PIL image for QR codes and returns their decoded data."""
+    if not _PYZBAR_AVAILABLE or qr_decode is None:
+        # Native zbar not available on this system; return no QR codes.
+        return []
     try:
         decoded = qr_decode(pil_img)
         return [d.data.decode("utf-8", errors="ignore") for d in decoded]

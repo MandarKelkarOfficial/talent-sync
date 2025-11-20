@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login API Test</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .result { background: #f0f0f0; padding: 10px; margin-top: 10px; border-radius: 4px; }
+        .success { color: green; }
+        .error { color: red; }
+        textarea { width: 100%; height: 200px; }
+    </style>
+</head>
+<body>
+    <h1>🔐 Login API Test</h1>
+    
+    <button onclick="testLogin()">Test Login with jane@example.com</button>
+    
+    <h3>Response:</h3>
+    <textarea id="response" readonly></textarea>
+    
+    <div id="result"></div>
+
+    <script>
+        async function testLogin() {
+            const resultDiv = document.getElementById('result');
+            const responseText = document.getElementById('response');
+            
+            try {
+                console.log('🔄 Attempting login...');
+                
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'jane@example.com',
+                        password: 'Test123'
+                    })
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                responseText.value = JSON.stringify(data, null, 2);
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class="result success">✅ Login Successful!<br>Token: ${data.token.substring(0, 50)}...</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="result error">❌ Login Failed: ${data.message}</div>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                responseText.value = error.toString();
+                resultDiv.innerHTML = `<div class="result error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Test on page load
+        window.onload = () => {
+            console.log('Page loaded. Server should be running on http://localhost:5000');
+        };
+    </script>
+</body>
+</html>

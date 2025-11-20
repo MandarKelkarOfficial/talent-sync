@@ -4,7 +4,8 @@
  * 
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+// Use relative path for proxy, or full URL if needed
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 const authService = {
   // Register user

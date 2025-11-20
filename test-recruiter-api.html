@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Recruiter View Test</title>
+</head>
+<body>
+    <h1>Recruiter View API Test</h1>
+    
+    <div id="output" style="white-space: pre; font-family: monospace; border: 1px solid #ccc; padding: 10px; margin: 10px 0; height: 400px; overflow: auto;"></div>
+    
+    <script>
+    async function test() {
+        const output = document.getElementById('output');
+        
+        function log(msg) {
+            output.textContent += msg + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        log('=== Starting Recruiter View API Test ===\n');
+        
+        // Test 1: Get token from localStorage
+        log('TEST 1: Check localStorage for token');
+        const savedSession = localStorage.getItem('user');
+        if (!savedSession) {
+            log('ERROR: No user session found in localStorage');
+            log('SOLUTION: Please log in first');
+            return;
+        }
+        
+        const session = JSON.parse(savedSession);
+        const token = session.token;
+        
+        if (!token) {
+            log('ERROR: No token found in session');
+            return;
+        }
+        
+        log(`SUCCESS: Found token: ${token.substring(0, 30)}...`);
+        log(`User: ${session.user?.name}`);
+        log(`Email: ${session.user?.email}\n`);
+        
+        // Test 2: Call the API
+        log('TEST 2: Calling /api/students/filter');
+        try {
+            const response = await fetch('http://localhost:5000/api/students/filter?minPercentage=85&sortBy=percentage', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            log(`Response Status: ${response.status}`);
+            
+            const data = await response.json();
+            log(`Response Success: ${data.success}`);
+            
+            if (data.success) {
+                log(`Found ${data.students.length} students:\n`);
+                data.students.forEach((s, i) => {
+                    log(`${i + 1}. ${s.name}`);
+                    log(`   ATS Score: ${s.resume?.ats?.score}`);
+                    log(`   Grade: ${s.academicDetails?.[0]?.grade}`);
+                });
+            } else {
+                log(`ERROR: ${data.message}`);
+            }
+            
+        } catch (error) {
+            log(`ERROR: ${error.message}`);
+        }
+    }
+    
+    window.onload = test;
+    </script>
+</body>
+</html>

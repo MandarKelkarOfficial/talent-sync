@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recruiter Dashboard - Talent Sync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        /* Header Navigation */
+        header {
+            background: white;
+            padding: 15px 40px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 1.3em;
+        }
+
+        .logo-purple {
+            background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+
+        .nav-menu {
+            display: flex;
+            gap: 35px;
+            align-items: center;
+            flex: 1;
+            justify-content: center;
+        }
+
+        .nav-menu a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .nav-menu a:hover {
+            color: #7c3aed;
+        }
+
+        .profile-icon {
+            background: #7c3aed;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Main Content */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 40px;
+        }
+
+        .filter-section {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .filter-input {
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95em;
+            background: white;
+            transition: border-color 0.3s;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        .filter-input::placeholder {
+            color: #999;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s;
+        }
+
+        .btn-apply {
+            background: #7c3aed;
+            color: white;
+        }
+
+        .btn-apply:hover {
+            background: #6d28d9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(124, 58, 237, 0.4);
+        }
+
+        .btn-reset {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-reset:hover {
+            background: #e0e0e0;
+        }
+
+        /* Results Grid */
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .student-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .student-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            border-color: #7c3aed;
+        }
+
+        .student-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2em;
+            font-weight: 700;
+            margin: 0 auto 15px;
+        }
+
+        .student-name {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .student-stat {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .student-stat strong {
+            color: #333;
+        }
+
+        .view-profile-btn {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .view-profile-btn:hover {
+            background: #357abd;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+            grid-column: 1 / -1;
+        }
+
+        .no-results h3 {
+            font-size: 1.3em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            grid-column: 1 / -1;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #7c3aed;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="logo">
+            <span class="logo-purple">TALENT</span>
+            <span style="color: #7c3aed; font-style: italic;">SYNC</span>
+        </div>
+        <div class="nav-menu">
+            <a>DASHBOARD</a>
+            <a>RESUME ANALYSIS</a>
+            <a>APPTITUDE CALCULATOR</a>
+            <a>EXPLORE</a>
+            <a style="font-weight: 700; color: #7c3aed;">RECRUITER</a>
+        </div>
+        <div class="profile-icon">RP</div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Filters -->
+        <div class="filter-section">
+            <input type="number" id="minPercentage" class="filter-input" placeholder="Min Percentage">
+            <input type="number" id="minAts" class="filter-input" placeholder="Min ATS Score">
+            <input type="text" id="skills" class="filter-input" placeholder="Required Skills (comma separated)">
+            <select id="sortBy" class="filter-input">
+                <option value="atsScore">Sort by ATS Score</option>
+                <option value="percentage">Sort by Percentage</option>
+            </select>
+        </div>
+
+        <!-- Buttons -->
+        <div class="button-group">
+            <button class="btn btn-apply" onclick="applyFilters()">Apply Filters</button>
+            <button class="btn btn-reset" onclick="resetFilters()">Reset</button>
+        </div>
+
+        <!-- Results -->
+        <div class="results-grid" id="studentsContainer" style="margin-top: 40px;">
+            <div class="loading">
+                <div class="spinner"></div>
+                Loading student data...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let allStudents = [];
+        let token = null;
+
+        // Initialize - Login first, then load students
+        async function initialize() {
+            try {
+                // Try to login with a demo account
+                const loginResponse = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'emily@example.com',
+                        password: 'Test123'
+                    })
+                });
+
+                if (!loginResponse.ok) {
+                    throw new Error('Failed to login with demo account');
+                }
+
+                const loginData = await loginResponse.json();
+                token = loginData.token;
+
+                // Load all students
+                await loadAllStudents();
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('studentsContainer').innerHTML = `
+                    <div class="no-results">
+                        <h3>⚠️ Unable to Load Data</h3>
+                        <p>Make sure the backend server is running on port 5000</p>
+                        <p style="margin-top: 10px; font-size: 0.9em;">Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadAllStudents() {
+            try {
+                // Fetch without filters to get all students
+                const response = await fetch(`${API_BASE}/students/filter`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch students');
+                }
+
+                const data = await response.json();
+                allStudents = data.students || data || [];
+                displayStudents(allStudents);
+            } catch (error) {
+                console.error('Error loading students:', error);
+                document.getElementById('studentsContainer').innerHTML = `
+                    <div class="no-results">
+                        <h3>Error Loading Data</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function applyFilters() {
+            try {
+                const minPercentage = document.getElementById('minPercentage').value;
+                const minAts = document.getElementById('minAts').value;
+                const skills = document.getElementById('skills').value;
+                const sortBy = document.getElementById('sortBy').value;
+
+                // Build query string
+                const params = new URLSearchParams();
+                if (minPercentage) params.append('minPercentage', minPercentage);
+                if (minAts) params.append('minAtsScore', minAts);
+                if (skills) params.append('skills', skills);
+                params.append('sortBy', sortBy);
+
+                // Show loading state
+                document.getElementById('studentsContainer').innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Applying filters...
+                    </div>
+                `;
+
+                const response = await fetch(`${API_BASE}/students/filter?${params.toString()}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to apply filters');
+                }
+
+                const data = await response.json();
+                const results = data.students || data || [];
+                displayStudents(results);
+            } catch (error) {
+                console.error('Error applying filters:', error);
+                document.getElementById('studentsContainer').innerHTML = `
+                    <div class="no-results">
+                        <h3>Error Applying Filters</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('minPercentage').value = '';
+            document.getElementById('minAts').value = '';
+            document.getElementById('skills').value = '';
+            document.getElementById('sortBy').value = 'atsScore';
+            loadAllStudents();
+        }
+
+        function displayStudents(students) {
+            const container = document.getElementById('studentsContainer');
+
+            if (!students || students.length === 0) {
+                container.innerHTML = `
+                    <div class="no-results">
+                        <h3>No students found</h3>
+                        <p>Try adjusting your filter criteria</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = students.map(student => {
+                const initials = (student.name || 'N/A')
+                    .split(' ')
+                    .map(n => n[0])
+                    .join('')
+                    .toUpperCase();
+
+                return `
+                    <div class="student-card">
+                        <div class="student-avatar">${initials}</div>
+                        <div class="student-name">${student.name || 'N/A'}</div>
+                        <div class="student-stat">
+                            <strong>ATS Score:</strong> ${student.resume?.atsScore || 'N/A'}
+                        </div>
+                        <div class="student-stat">
+                            <strong>Skills:</strong> ${student.resume?.skills?.join(', ') || 'N/A'}
+                        </div>
+                        <div class="student-stat">
+                            <strong>Academic Score:</strong> ${student.academicDetail?.percentage || 'N/A'}%
+                        </div>
+                        <button class="view-profile-btn">View Profile</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', initialize);
+    </script>
+</body>
+</html>

@@ -1,53 +1,55 @@
 # File: app/core/config.py
 
 """
-Configuration Management
-Author: Mandar . k
-Date: 2024-10-10
-
-This module handles the loading and validation of environment variables
-for the application using Pydantic's BaseSettings.
+Lightweight configuration loader
+This replaces the earlier pydantic-based loader to avoid hard dependency on pydantic
+so the app can start in environments where pydantic/pydantic-settings are not installed
+or have incompatible versions. It reads environment variables via python-dotenv and
+performs minimal validation required by the application.
 """
 
 import os
 import base64
-from pydantic import BaseSettings, validator
+from typing import Optional
+from dataclasses import dataclass
+from pathlib import Path
+from dotenv import load_dotenv
 
-class Settings(BaseSettings):
-    """
-    Application settings loaded from environment variables.
-    """
-    SERVER_ENDPOINT: str = "http://localhost:5000/api/certificates"
-    AES_KEY_BASE64: str
-    HUGGINGFACE_API_KEY: str
-    UPLOAD_DIR: str = "./encrypted_uploads"
-    POST_TIMEOUT_SECONDS: int = 30
-    POST_RETRIES: int = 3
-    TESSERACT_CMD: str | None = None
+# Load .env from the backend folder (two levels up from this file)
+here = Path(__file__).resolve().parent
+project_root = here.parent.parent
+dotenv_path = project_root / ".env"
+if dotenv_path.exists():
+    load_dotenv(dotenv_path)
+else:
+    # Fall back to default load (environment only)
+    load_dotenv()
 
-    AES_KEY: bytes | None = None  # Will be derived from AES_KEY_BASE64
 
-    @validator("AES_KEY_BASE64")
-    def validate_aes_key(cls, v: str) -> str:
-        """Validates that the AES key is a valid base64-encoded 32-byte string."""
-        if not v:
-            raise ValueError("AES_KEY_BASE64 must be set in .env (base64 of 32 random bytes).")
+@dataclass
+class Settings:
+    SERVER_ENDPOINT: str = os.getenv("SERVER_ENDPOINT", "http://localhost:5000/api/certificates")
+    AES_KEY_BASE64: Optional[str] = os.getenv("AES_KEY_BASE64")
+    HUGGINGFACE_API_KEY: Optional[str] = os.getenv("HUGGINGFACE_API_KEY")
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./encrypted_uploads")
+    POST_TIMEOUT_SECONDS: int = int(os.getenv("POST_TIMEOUT_SECONDS", "30"))
+    POST_RETRIES: int = int(os.getenv("POST_RETRIES", "3"))
+    TESSERACT_CMD: Optional[str] = os.getenv("TESSERACT_CMD")
+
+    AES_KEY: Optional[bytes] = None
+
+    def __post_init__(self):
+        if not self.AES_KEY_BASE64:
+            raise RuntimeError("AES_KEY_BASE64 must be set in .env (base64 of 32 random bytes).")
         try:
-            key_bytes = base64.b64decode(v)
-            if len(key_bytes) != 32:
-                raise ValueError("AES_KEY_BASE64 must decode to 32 bytes (AES-256 key).")
-            # Store the decoded bytes in the settings object for later use
-            cls.AES_KEY = key_bytes
-            return v
-        except Exception as e:
-            raise ValueError(f"AES_KEY_BASE64 is not valid: {e}") from e
+            key_bytes = base64.b64decode(self.AES_KEY_BASE64)
+        except Exception as exc:  # pragma: no cover - invalid env
+            raise RuntimeError("AES_KEY_BASE64 is not valid base64.") from exc
+        if len(key_bytes) != 32:
+            raise RuntimeError("AES_KEY_BASE64 must decode to 32 bytes (AES-256 key).")
+        self.AES_KEY = key_bytes
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
-# Create a single settings instance to be used across the application
+# Instantiate and make sure upload dir exists
 settings = Settings()
-
-# Ensure the upload directory exists
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

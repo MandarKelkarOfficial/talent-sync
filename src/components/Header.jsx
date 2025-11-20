@@ -16,9 +16,10 @@ import logo from '../assets/img/Talentsync.png';
 
 const navLinks = [
   { name: 'DASHBOARD', path: '/dashboard' },
-  { name: ' RESUME ANALYSIS', path: '/resume-analysis' },
+  { name: 'RESUME ANALYSIS', path: '/resume-analysis' },
   { name: 'APPTITUDE CALCULATOR', path: '/aptitude-calculator' },
-  { name: 'EXPLORE', path: '/explore' }
+  { name: 'EXPLORE', path: '/explore' },
+  { name: 'RECRUITER', path: '/recruiter' }
 ];
 
 const Header = () => {
