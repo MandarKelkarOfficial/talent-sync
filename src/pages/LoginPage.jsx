@@ -1,8 +1,7 @@
 /**
- *  @author Mandar K.
+ * @author Mandar K.
  * @date 2025-09-13
- * 
- */
+ * */
 
 // File: src/pages/LoginPage.jsx
 import React, { useState } from "react";
@@ -16,10 +15,11 @@ export default function LoginPage() {
   const { login, register } = useAuth(); // Using useAuth hook instead of useContext
   const navigate = useNavigate();
 
-  // called by LoginForm
+  // called by LoginForm (MODIFIED)
   const handleLogin = async (data) => {
     try {
-      const result = await login(data.email, data.password);
+      // Pass the isRecruiter flag to the context login function
+      const result = await login(data.email, data.password, data.isRecruiter);
       
       if (result.success) {
         // Navigation is handled automatically in AuthContext
@@ -35,6 +35,7 @@ export default function LoginPage() {
   // called by RegisterForm
   const handleRegister = async (data) => {
     try {
+      // data now contains the isRecruiter flag implicitly
       const result = await register(data);
       
       if (result.success) {

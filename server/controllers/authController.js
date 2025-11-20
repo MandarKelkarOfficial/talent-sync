@@ -1,8 +1,7 @@
 /**
- *  @author Mandar K.
+ * @author Mandar K.
  * @date 2025-09-13
- * 
- */
+ * */
 
 // controllers/authController.js
 import bcrypt from "bcryptjs";
@@ -13,6 +12,9 @@ import jwt from 'jsonwebtoken';
 import { fileURLToPath } from 'url';
 import StudentDetails from "../models/StudentDetails.js";
 import PendingRegistration from "../models/PendingRegistration.js";
+// NEW: Import Recruiter Model
+import Recruiter from "../models/Recruiter.js"; 
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,8 +56,8 @@ export const authController = {
     }
 
     try {
-      // Check if user already exists (checking both mobile and phoneNumber for compatibility)
-      const existingUser = await StudentDetails.findOne({
+      // Check if user already exists (checking both Student and Recruiter)
+      const existingStudent = await StudentDetails.findOne({
         $or: [
           { email },
           { mobile },
@@ -63,11 +65,13 @@ export const authController = {
         ]
       });
 
-      if (existingUser) {
+      // NEW: Check recruiter table too
+      const existingRecruiter = await Recruiter.findOne({ email });
+
+      if (existingStudent || existingRecruiter) {
         return res.status(409).json({
           success: false,
-          message: existingUser.email === email ?
-            "Email already exists" : "Mobile number already exists"
+          message: "Email or Mobile number already exists"
         });
       }
 
@@ -280,9 +284,9 @@ export const authController = {
     }
   },
 
-  // Login (Enhanced with face verification status)
+  // Login (Modified to handle isRecruiter flag implicitly - this is the student login route)
   login: async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password } = req.body; // isRecruiter check is done on the client side now
 
     if (!email || !password) {
       return res.status(400).json({
@@ -292,12 +296,14 @@ export const authController = {
     }
 
     try {
+      // Find Student
       const user = await StudentDetails.findOne({ email });
 
       if (!user) {
+        // If student not found, try to find a recruiter (client should have hit /api/recruiter-auth/login if isRecruiter was true, but we try anyway for safety)
         return res.status(400).json({
           success: false,
-          message: "User not found"
+          message: "User not found (Try Recruiter login if applicable)"
         });
       }
 
@@ -324,18 +330,17 @@ export const authController = {
         });
       }
 
-      // 👇 --- THIS IS THE NEW PART ---
-      // Create JWT Payload
+      // Create JWT Payload - Add role
       const payload = {
         id: user._id,
         name: user.name,
+        role: 'student' // IMPORTANT: Define role
       };
 
       // Sign the token
       const token = jwt.sign(payload, process.env.JWT_SECRET, {
         expiresIn: '1d', // Token expires in 1 day
       });
-      // --- END OF NEW PART ---
 
       // Update last login
       user.lastLogin = new Date();
@@ -348,11 +353,14 @@ export const authController = {
         success: true,
         message: "Login successful",
         token: token, 
-        user: userData
+        user: {
+          ...userData,
+          role: 'student' // Return the role to the client
+        }
       });
 
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Student Login error:", error);
       res.status(500).json({
         success: false,
         message: "Server error during login"
@@ -365,8 +373,8 @@ export const authController = {
     const { email, mobile } = req.body;
 
     try {
-      // Check both mobile and phoneNumber fields for compatibility
-      const existingUser = await StudentDetails.findOne({
+      // Check both mobile and phoneNumber fields for compatibility in Student table
+      const existingStudent = await StudentDetails.findOne({
         $or: [
           { email },
           { mobile },
@@ -374,19 +382,15 @@ export const authController = {
         ]
       });
 
-      if (existingUser) {
-        if (existingUser.email === email) {
-          return res.status(409).json({
+      // NEW: Check recruiter table too
+      const existingRecruiter = await Recruiter.findOne({ email });
+
+      if (existingStudent || existingRecruiter) {
+        // We just return a generic 'already exists' message for security/simplicity
+        return res.status(409).json({
             success: false,
-            message: "Email already exists"
-          });
-        }
-        if (existingUser.mobile === mobile || existingUser.phoneNumber === mobile) {
-          return res.status(409).json({
-            success: false,
-            message: "Mobile number already exists"
-          });
-        }
+            message: "Email or Mobile number already exists"
+        });
       }
 
       res.json({ success: true });
@@ -404,7 +408,11 @@ export const authController = {
     try {
       const { userId } = req.params;
 
-      const user = await StudentDetails.findById(userId).select('-password');
+      // Check both student and recruiter tables
+      let user = await StudentDetails.findById(userId).select('-password');
+      if (!user) {
+        user = await Recruiter.findById(userId).select('-password');
+      }
 
       if (!user) {
         return res.status(404).json({
@@ -412,10 +420,15 @@ export const authController = {
           message: "User not found"
         });
       }
+      
+      const role = user.companyName ? 'recruiter' : 'student';
 
       res.json({
         success: true,
-        user: user
+        user: {
+            ...user.toObject(),
+            role // Attach role to the response
+        }
       });
 
     } catch (error) {
@@ -432,8 +445,24 @@ export const authController = {
     try {
       const { userId } = req.params;
       const { mobile, address, pincode } = req.body;
+      
+      // Check both student and recruiter tables
+      let user = await StudentDetails.findById(userId);
+      let role = 'student';
 
-      const user = await StudentDetails.findById(userId);
+      if (!user) {
+        user = await Recruiter.findById(userId);
+        role = 'recruiter';
+
+        // Additional fields for recruiter update
+        if (role === 'recruiter') {
+            const { companyName, companyEmail, age } = req.body;
+            if (companyName !== undefined) user.companyName = companyName;
+            if (companyEmail !== undefined) user.companyEmail = companyEmail;
+            if (age !== undefined) user.age = age;
+        }
+      }
+
 
       if (!user) {
         return res.status(404).json({
@@ -442,7 +471,7 @@ export const authController = {
         });
       }
 
-      // Update allowed fields only
+      // Update common allowed fields
       if (mobile !== undefined) user.phoneNumber = mobile;
       if (address !== undefined) user.address = address;
       if (pincode !== undefined) user.pincode = pincode;
@@ -454,7 +483,10 @@ export const authController = {
       res.json({
         success: true,
         message: "Profile updated successfully",
-        user: userData
+        user: {
+            ...userData,
+            role // Return the role
+        }
       });
 
     } catch (error) {

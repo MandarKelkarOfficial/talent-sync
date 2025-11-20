@@ -1,8 +1,7 @@
 /**
- *  @author Mandar K.
+ * @author Mandar K.
  * @date 2025-09-13
- * 
- */
+ * */
 
 // File: src/components/RegisterForm.jsx
 import React, { useState } from "react";
@@ -10,12 +9,13 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, User, Mail, Phone, MapPin, Lock, AlertCircle, CheckCircle, Calendar } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Phone, MapPin, Lock, AlertCircle, CheckCircle, Calendar, Briefcase, Hash } from "lucide-react";
 
 // --- Validation schema ---
-// Added: birthdate (string, date, minimum age 13) and gender (enum)
 const MIN_AGE = 13;
-const registerSchema = z.object({
+
+// 1. Define Common Fields (used by both) to avoid duplication
+const commonFields = {
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   mobile: z.string().regex(/^[0-9]{10}$/, "Mobile number must be exactly 10 digits"),
@@ -24,36 +24,85 @@ const registerSchema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[a-zA-Z]/, "Password must contain at least one letter"),
   address: z.string().min(5, "Address must be at least 5 characters"),
+};
+
+// 2. Student Schema
+const studentSchema = z.object({
+  ...commonFields,
+  isRecruiter: z.literal(false),
   pincode: z.string().regex(/^[0-9]{6}$/, "Pincode must be exactly 6 digits"),
   birthdate: z.string().refine((val) => {
-    // validate date and min age
     if (!val) return false;
     const d = new Date(val);
     if (Number.isNaN(d.getTime())) return false;
     const now = new Date();
-    // calculate age in years
     let age = now.getFullYear() - d.getFullYear();
     const m = now.getMonth() - d.getMonth();
     if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
     return age >= MIN_AGE;
   }, { message: `You must be at least ${MIN_AGE} years old` }),
-  gender: z.enum(['male','female','other'], { errorMap: () => ({ message: "Please select a gender" }) })
+  gender: z.enum(['male', 'female', 'other'], { errorMap: () => ({ message: "Please select a gender" }) })
 });
+
+// 3. Recruiter Schema
+const recruiterSchema = z.object({
+  ...commonFields,
+  isRecruiter: z.literal(true),
+  companyName: z.string().min(2, "Company name is required"),
+  // Handle empty string OR valid email for optional field
+  companyEmail: z.union([z.literal(""), z.string().email("Invalid company email")]),
+  // Handle number input (valueAsNumber returns NaN if empty)
+  age: z.number({ invalid_type_error: "Age must be a number" })
+        .min(18, "Must be at least 18")
+        .optional()
+        .or(z.nan()),
+});
+
+// 4. Discriminated Union
+const formSchema = z.discriminatedUnion("isRecruiter", [
+  studentSchema,
+  recruiterSchema,
+]);
 
 /**
  * Props:
- *  - onSubmit(formData) => Promise<{ success: boolean, message?: string } | boolean>
- *  - onSwitch() => toggles form mode in parent (LoginPage)
+ * - onSubmit(formData) => Promise<{ success: boolean, message?: string } | boolean>
+ * - onSwitch() => toggles form mode in parent (LoginPage)
  */
 export default function RegisterForm({ onSubmit, onSwitch }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [isRecruiter, setIsRecruiter] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
-    resolver: zodResolver(registerSchema),
+  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+    resolver: zodResolver(formSchema),
+    defaultValues: { 
+      isRecruiter: false, 
+      gender: '',
+      companyEmail: '', // Ensure default exists
+    }
   });
+
+  // Watch for Recruiter checkbox change and reset the form/validation
+  const handleRecruiterToggle = (checked) => {
+    setIsRecruiter(checked);
+    setServerError(""); // Clear previous errors
+    // Reset form fields state when switching role to match new schema defaults
+    reset({ 
+      isRecruiter: checked, 
+      gender: '', 
+      name: '', 
+      email: '', 
+      mobile: '', 
+      password: '', 
+      address: '',
+      companyName: '',
+      companyEmail: '',
+      age: NaN
+    });
+  };
 
   // today's date for date input max
   const today = new Date().toISOString().split("T")[0];
@@ -62,22 +111,54 @@ export default function RegisterForm({ onSubmit, onSwitch }) {
     setIsSubmitting(true);
     setServerError("");
     try {
-      // data now contains: name, email, mobile, password, address, pincode, birthdate, gender
-      const result = await onSubmit?.(data);
+      // Ensure isRecruiter is strictly boolean in payload
+      const payload = { ...data, isRecruiter: isRecruiter }; 
+
+      // If recruiter, manually map mobile to phoneNumber if needed, and clean up
+      if (isRecruiter) {
+        payload.phoneNumber = payload.mobile;
+        delete payload.mobile;
+        
+        // Clean up optional fields if they are NaN or empty
+        if (Number.isNaN(payload.age)) delete payload.age;
+        if (payload.companyEmail === "") delete payload.companyEmail;
+      }
+
+      const result = await onSubmit?.(payload);
       const ok = typeof result === "object" ? result.success : result;
       if (ok) {
         setRegistrationSuccess(true);
-        setTimeout(() => setRegistrationSuccess(false), 3000);
-        // Parent (LoginPage) will navigate to /otp and pass data via navigate state if desired
+        // Recruiter flow handles navigation immediately to /login
+        // Student flow navigates to /otp
       } else {
         setServerError(result?.message || "Registration failed");
       }
     } catch (err) {
+      console.error("Submission error:", err);
       setServerError(err?.message || "Something went wrong");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const formTitle = isRecruiter ? "Register as Recruiter" : "Create a Student Account";
+  const formSubtitle = isRecruiter ? "Find talent and manage recruitment" : "Join us and unlock your potential";
+
+  const Input = ({ label, name, icon: Icon, type = "text", ...rest }) => (
+    <div>
+      <label className="block text-sm font-medium text-gray-600 mb-1">{label}</label>
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Icon size={18} className="text-gray-400" /></div>
+        <input
+          type={type}
+          {...register(name, { valueAsNumber: type === 'number' })}
+          className={`pl-10 mt-2 w-full px-4 py-3 border ${errors[name] ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition`}
+          {...rest}
+        />
+      </div>
+      {errors[name] && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors[name].message}</p>)}
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 px-4 py-8">
@@ -86,7 +167,7 @@ export default function RegisterForm({ onSubmit, onSwitch }) {
           {registrationSuccess && (
             <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="bg-green-100 text-green-700 p-4 flex items-center gap-2">
               <CheckCircle size={20} />
-              <span>Registration successful! Redirecting to verify OTP...</span>
+              <span>Registration successful! Redirecting...</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -100,79 +181,72 @@ export default function RegisterForm({ onSubmit, onSwitch }) {
 
         <div className="p-6 md:p-8">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.5 }} className="text-center mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-blue-700">Create an Account ✨</h2>
-            <p className="text-gray-500 mt-2">Join us and unlock your potential</p>
+            <h2 className="text-2xl md:text-3xl font-bold text-blue-700">{formTitle} ✨</h2>
+            <p className="text-gray-500 mt-2">{formSubtitle}</p>
           </motion.div>
 
+          {/* Recruiter Toggle */}
+          <div className="flex items-center justify-end mb-4">
+            <label className="flex items-center space-x-2 cursor-pointer p-2 bg-purple-50 rounded-lg transition-colors hover:bg-purple-100">
+              <input
+                type="checkbox"
+                checked={isRecruiter}
+                onChange={(e) => handleRecruiterToggle(e.target.checked)}
+                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+              />
+              <span className="text-sm font-medium text-purple-700">I am a Recruiter</span>
+            </label>
+          </div>
+
           <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit(handleRegisterSubmit)}>
-            {/* Name */}
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Full Name</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><User size={18} className="text-gray-400" /></div>
-                <input type="text" {...register("name")} placeholder="John Doe" className={`pl-10 mt-2 w-full px-4 py-3 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition`} />
-              </div>
-              {errors.name && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.name.message}</p>)}
-            </div>
 
-            {/* Email */}
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Email Address</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Mail size={18} className="text-gray-400" /></div>
-                <input type="email" {...register("email")} placeholder="you@example.com" className={`pl-10 mt-2 w-full px-4 py-3 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition`} />
-              </div>
-              {errors.email && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.email.message}</p>)}
-            </div>
+            {/* Common Fields */}
+            <Input label="Full Name" name="name" icon={User} placeholder="John Doe" />
+            <Input label="Email Address" name="email" icon={Mail} type="email" placeholder="you@example.com" />
+            <Input label="Mobile Number" name="mobile" icon={Phone} placeholder="9876543210" />
 
-            {/* Mobile */}
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Mobile Number</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Phone size={18} className="text-gray-400" /></div>
-                <input type="text" {...register("mobile")} placeholder="9876543210" className={`pl-10 mt-2 w-full px-4 py-3 border ${errors.mobile ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition`} />
-              </div>
-              {errors.mobile && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.mobile.message}</p>)}
-            </div>
+            {/* Recruiter Specific Fields */}
+            {isRecruiter && (
+              <>
+                <Input label="Company Name" name="companyName" icon={Briefcase} placeholder="Acme Corp" />
+                <Input label="Company Email" name="companyEmail" icon={Mail} type="email" placeholder="hr@acmecorp.com" />
+                <Input label="Age" name="age" icon={Hash} type="number" placeholder="25" />
+              </>
+            )}
 
-            {/* Pincode */}
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Pincode</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><MapPin size={18} className="text-gray-400" /></div>
-                <input type="text" {...register("pincode")} placeholder="560001" className={`pl-10 mt-2 w-full px-4 py-3 border ${errors.pincode ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition`} />
-              </div>
-              {errors.pincode && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.pincode.message}</p>)}
-            </div>
+            {/* Student Specific Fields */}
+            {!isRecruiter && (
+              <>
+                {/* Birthdate (age) */}
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Birthdate</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Calendar size={18} className="text-gray-400" /></div>
+                    <input
+                      type="date"
+                      {...register("birthdate")}
+                      max={today}
+                      className={`pl-10 mt-2 w-full px-4 py-3 border ${errors.birthdate ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition`}
+                    />
+                  </div>
+                  {errors.birthdate && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.birthdate.message}</p>)}
+                </div>
 
-            {/* Birthdate (age) */}
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Birthdate</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Calendar size={18} className="text-gray-400" /></div>
-                <input
-                  type="date"
-                  {...register("birthdate")}
-                  max={today}
-                  className={`pl-10 mt-2 w-full px-4 py-3 border ${errors.birthdate ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition`}
-                />
-              </div>
-              {errors.birthdate && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.birthdate.message}</p>)}
-            </div>
-
-            {/* Gender */}
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Gender</label>
-              <div className="relative">
-                <select {...register("gender")} className={`pl-3 mt-2 w-full px-4 py-3 border ${errors.gender ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition`}>
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              {errors.gender && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.gender.message}</p>)}
-            </div>
+                {/* Gender */}
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Gender</label>
+                  <div className="relative">
+                    <select {...register("gender")} className={`pl-3 mt-2 w-full px-4 py-3 border ${errors.gender ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition`}>
+                      <option value="">Select gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  {errors.gender && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.gender.message}</p>)}
+                </div>
+              </>
+            )}
 
             {/* Address */}
             <div className="md:col-span-2">
@@ -184,8 +258,20 @@ export default function RegisterForm({ onSubmit, onSwitch }) {
               {errors.address && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.address.message}</p>)}
             </div>
 
+            {/* Pincode (only for student) */}
+            {!isRecruiter && (
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-gray-600 mb-1">Pincode</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><MapPin size={18} className="text-gray-400" /></div>
+                  <input type="text" {...register("pincode")} placeholder="560001" className={`pl-10 mt-2 w-full px-4 py-3 border ${errors.pincode ? 'border-red-500' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 transition`} />
+                </div>
+                {errors.pincode && (<p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={12} />{errors.pincode.message}</p>)}
+              </div>
+            )}
+
             {/* Password */}
-            <div className="md:col-span-2">
+            <div className={isRecruiter ? "md:col-span-1" : "md:col-span-2"}>
               <label className="block text-sm font-medium text-gray-600 mb-1">Password</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Lock size={18} className="text-gray-400" /></div>

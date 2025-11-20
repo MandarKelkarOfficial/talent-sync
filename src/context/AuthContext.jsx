@@ -5,10 +5,9 @@
  */
 
 /**
- *  @author Mandar K.
+ * @author Mandar K.
  * @date 2025-09-13
- * 
- */
+ * */
 
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -48,6 +47,10 @@ export const AuthProvider = ({ children }) => {
       if (savedSession) {
         const sessionData = JSON.parse(savedSession);
         if (sessionData?.token) {
+          // ensure the user object has a role, defaulting to 'student'
+          if (!sessionData.user.role) {
+            sessionData.user.role = sessionData.user.companyName ? 'recruiter' : 'student';
+          }
           setSession(sessionData);
         } else {
           localStorage.removeItem('user');
@@ -63,17 +66,27 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * Login user and persist session.
+   * MODIFIED to accept isRecruiter flag.
    */
-  const login = async (email, password) => {
+  const login = async (email, password, isRecruiter) => {
     try {
       setIsLoading(true);
-      const sessionData = await authService.login(email, password);
+      // Pass isRecruiter to authService
+      const sessionData = await authService.login(email, password, isRecruiter);
 
       if (sessionData.success && sessionData.token) {
+        // Ensure role is set in the client state
+        if (!sessionData.user.role) {
+            sessionData.user.role = isRecruiter ? 'recruiter' : 'student';
+        }
+        
         setSession(sessionData);
         localStorage.setItem('user', JSON.stringify(sessionData));
 
-        const from = location.state?.from?.pathname || '/dashboard';
+        // Determine navigation based on role
+        const defaultRoute = sessionData.user.role === 'recruiter' ? '/recruiter' : '/dashboard';
+        const from = location.state?.from?.pathname || defaultRoute;
+        
         navigate(from, { replace: true });
         return { success: true };
       } else {
@@ -129,8 +142,14 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authService.register(userData);
       if (response.success) {
-        localStorage.setItem('pendingRegistration', JSON.stringify(userData));
-        navigate('/otp', { state: { email: userData.email } });
+        // Only set pending registration for student flow (non-recruiter)
+        if (!userData.isRecruiter) {
+            localStorage.setItem('pendingRegistration', JSON.stringify(userData));
+            navigate('/otp', { state: { email: userData.email } });
+        } else {
+            // Recruiter success, go straight to login
+            navigate('/login', { state: { message: 'Recruiter registration successful! Please log in.' } });
+        }
         return { success: true };
       } else {
         return { success: false, message: response.message };

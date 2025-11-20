@@ -1,8 +1,7 @@
 /**
- *  @author Mandar K.
+ * @author Mandar K.
  * @date 2025-09-13
- * 
- */
+ * */
 
 // File: src/components/LoginForm.jsx
 import React, { useState } from "react";
@@ -11,14 +10,15 @@ import { Eye, EyeOff, Mail, Lock, AlertCircle, CheckCircle } from "lucide-react"
 
 /**
  * Props:
- *  - onSubmit(formData) => Promise<{ success: boolean, message?: string } | boolean>
- *  - onSwitch() => toggles form mode in parent (LoginPage)
+ * - onSubmit(formData) => Promise<{ success: boolean, message?: string } | boolean>
+ * - onSwitch() => toggles form mode in parent (LoginPage)
  */
 export default function LoginForm({ onSubmit, onSwitch }) {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    rememberMe: false
+    rememberMe: false,
+    isRecruiter: false // NEW: Recruiter checkbox state
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,7 +52,7 @@ export default function LoginForm({ onSubmit, onSwitch }) {
 
     setIsSubmitting(true);
     try {
-      // Expect a boolean or an object { success, message }
+      // Pass isRecruiter flag to the parent onSubmit handler
       const result = await onSubmit?.(formData);
       const ok = typeof result === "object" ? result.success : result;
       if (ok) {
@@ -151,6 +151,20 @@ export default function LoginForm({ onSubmit, onSwitch }) {
                 <span className="text-gray-600 select-none">Remember me</span>
               </label>
               <a href="#" className="text-blue-600 hover:underline text-sm">Forgot password?</a>
+            </div>
+            
+            {/* NEW: Is Recruiter Checkbox */}
+            <div className="flex items-center justify-center text-sm p-2 bg-gray-50 rounded-lg">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  name="isRecruiter" 
+                  checked={formData.isRecruiter} 
+                  onChange={handleChange} 
+                  className="w-4 h-4 text-purple-500 rounded focus:ring-purple-400" 
+                />
+                <span className="text-gray-700 select-none font-medium">Log in as Recruiter</span>
+              </label>
             </div>
 
             <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} type="submit" disabled={isSubmitting} className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2">

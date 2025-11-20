@@ -1,26 +1,16 @@
 /**
- *  @author Mandar K.
+ * @author Mandar K.
  * @date 2025-09-13
- * 
+ * @description Updated Header to conditionally render navigation links based on user role (Student vs Recruiter).
  */
 
-
-// src/components/Header.jsx
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faTimes, faUser, faCog, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+import { faBars, faTimes, faUser, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // adjust path if needed
+import { useAuth } from '../context/AuthContext'; 
 import logo from '../assets/img/Talentsync.png';
-
-const navLinks = [
-  { name: 'DASHBOARD', path: '/dashboard' },
-  { name: 'RESUME ANALYSIS', path: '/resume-analysis' },
-  { name: 'APPTITUDE CALCULATOR', path: '/aptitude-calculator' },
-  { name: 'EXPLORE', path: '/explore' },
-  { name: 'RECRUITER', path: '/recruiter' }
-];
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -28,18 +18,32 @@ const Header = () => {
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
-  // Safely get auth user; if useAuth throws, treat as unauthenticated
-  let user = null;
-  let logout = null;
-  try {
-    const auth = useAuth();
-    if (auth?.user) user = auth.user;
-    if (auth?.logout) logout = auth.logout;
-  } catch (e) {
-    user = null;
-  }
+  // Get auth state
+  const { user, logout } = useAuth();
+  const isAuthenticated = !!user;
+  
+  // Determine role (default to student if undefined)
+  const userRole = user?.role || 'student';
 
-  const isAuthenticated = Boolean(user && (user.email || user._id || user.name));
+  // Dynamically calculate links based on role
+  const navLinks = useMemo(() => {
+    if (!isAuthenticated) return [];
+
+    if (userRole === 'recruiter') {
+      return [
+        { name: 'RECRUITER DASHBOARD', path: '/recruiter' }
+      ];
+    }
+
+    // Default (Student) Links
+    return [
+      { name: 'DASHBOARD', path: '/dashboard' },
+      { name: 'RESUME ANALYSIS', path: '/resume-analysis' },
+      { name: 'APTITUDE CALCULATOR', path: '/aptitude-calculator' },
+      { name: 'EXPLORE', path: '/explore' },
+      // Removed 'RECRUITER' link for students to keep views separate
+    ];
+  }, [isAuthenticated, userRole]);
 
   const getInitials = (name) => {
     if (!name) return '';
@@ -71,10 +75,12 @@ const Header = () => {
   }, []);
 
   return (
-    <NavContainer >
-      <Logo to="/dashboard"><img className='w-60 ' src={logo} alt="" /></Logo>
+    <NavContainer>
+      <Logo to={userRole === 'recruiter' ? "/recruiter" : "/dashboard"}>
+        <img className='w-60' src={logo} alt="TalentSync Logo" />
+      </Logo>
 
-      {/* Only show hamburger when authenticated (mobile menu only for logged-in users) */}
+      {/* Only show hamburger when authenticated */}
       {isAuthenticated && (
         <Hamburger
           aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
@@ -115,10 +121,12 @@ const Header = () => {
           </UserProfileButton>
 
           <DropdownMenu $isOpen={isDropdownOpen}>
-            <StyledLink to="/profile"><DropdownItem onClick={() => setIsDropdownOpen(false)}>
-              <FontAwesomeIcon icon={faUser} />
-              Profile
-            </DropdownItem></StyledLink>
+            <StyledLink to="/profile">
+              <DropdownItem onClick={() => setIsDropdownOpen(false)}>
+                <FontAwesomeIcon icon={faUser} />
+                Profile
+              </DropdownItem>
+            </StyledLink>
 
             <DropdownDivider />
             <DropdownItem onClick={handleLogout}>
@@ -128,7 +136,6 @@ const Header = () => {
           </DropdownMenu>
         </UserProfileContainer>
       ) : (
-        // Optional: minimal right-side actions for unauthenticated (Login/Register)
         <AuthActions>
           <p className='text-gray-600'>Please Login or Register to continue !</p>
         </AuthActions>
@@ -138,7 +145,6 @@ const Header = () => {
 };
 
 export default Header;
-
 
 /* ---------- STYLED COMPONENTS ---------- */
 
@@ -178,13 +184,17 @@ const NavContainer = styled.header`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 3rem;
+  padding: 0 3rem;
   height: 70px;
   background: linear-gradient(90deg, ${COLORS.white} 0%, ${COLORS.lightBlue} 100%);
   box-shadow: 0 2px 6px rgba(0,0,0,0.06);
   position: sticky;
   top: 0;
   z-index: 1000;
+
+  @media (max-width: 768px) {
+    padding: 0 1.5rem;
+  }
 `;
 
 const Logo = styled(Link)`
@@ -192,6 +202,8 @@ const Logo = styled(Link)`
   font-weight: 700;
   color: ${COLORS.darkText};
   text-decoration: none;
+  display: flex;
+  align-items: center;
 `;
 
 /* hamburger - hidden on desktop */
@@ -205,10 +217,6 @@ const Hamburger = styled.button`
 
   @media (max-width: 768px) {
     display: block;
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
   }
 `;
 
@@ -244,6 +252,7 @@ const NavLinks = styled.nav`
       opacity: ${({ $isOpen }) => ($isOpen ? '1' : '0')};
       pointer-events: ${({ $isOpen }) => ($isOpen ? 'auto' : 'none')};
       z-index: 999;
+      align-items: center; 
     }
   }
 `;
@@ -251,10 +260,11 @@ const NavLinks = styled.nav`
 const StyledLink = styled(Link)`
   color: ${COLORS.darkText};
   text-decoration: none;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   padding-bottom: 0.25rem;
   position: relative;
+  white-space: nowrap;
 
   &::after {
     content: '';

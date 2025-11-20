@@ -1,8 +1,7 @@
 /**
- *  @author Mandar K.
+ * @author Mandar K.
  * @date 2025-09-13
- * 
- */
+ * */
 
 
 import express from "express";
@@ -19,6 +18,7 @@ import aptitudeRoutes from './routes/aptitudeRoutes.js';
 import faceProfileRoutes from './routes/faceProfileRoutes.js'; 
 import certificateRoutes from './routes/certificateRoutes.js'; 
 import recruiterRoutes from './routes/recruiterRoutes.js';
+import recruiterAuthRoutes from './routes/recruiterAuthRoutes.js'; // NEW: Recruiter Auth Routes
 
 dotenv.config();
 
@@ -55,6 +55,7 @@ app.get("/", (req, res) => {
 
 // --- API Routes ---
 app.use("/api/auth", authRoutes);
+app.use('/api/recruiter-auth', recruiterAuthRoutes); // NEW: Recruiter Auth Routes
 app.use('/api/resumes', resumeRoutes); 
 app.use('/api/aptitude', aptitudeRoutes);
 app.use('/api/face-profile', faceProfileRoutes); 

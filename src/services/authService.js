@@ -1,8 +1,7 @@
 /**
- *  @author Mandar K.
+ * @author Mandar K.
  * @date 2025-09-13
- * 
- */
+ * */
 
 // Use relative path for proxy, or full URL if needed
 const API_URL = import.meta.env.VITE_API_URL || '/api'
@@ -11,6 +10,22 @@ const authService = {
   // Register user
   register: async (userData) => {
     try {
+      // NEW: If recruiter data is provided, use the new recruiter register route
+      if (userData.isRecruiter) {
+        const response = await fetch(`${API_URL}/recruiter-auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Recruiter registration failed');
+        }
+        return data; // Recruiter registration succeeds without OTP flow
+      }
+
+
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: {
@@ -22,7 +37,7 @@ const authService = {
       const data = await response.json()
       
       if (!response.ok) {
-        throw new Error(data.message || 'Registration failed')
+        throw new Error(data.message || 'Student registration failed')
       }
       
       return data
@@ -32,10 +47,12 @@ const authService = {
     }
   },
 
-  // Login user
-  login: async (email, password) => {
+  // Login user (modified to check for isRecruiter flag)
+  login: async (email, password, isRecruiter = false) => {
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const endpoint = isRecruiter ? `${API_URL}/recruiter-auth/login` : `${API_URL}/auth/login`;
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
