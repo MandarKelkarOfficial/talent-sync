@@ -46,6 +46,17 @@ const DB_NAME = process.env.DB_NAME || 'student';
 //   })
 //   .then(() => console.log(`Connected to MongoDB - Database: ${DB_NAME}`))
 //   .catch((err) => console.error("MongoDB connection error:", err));
+
+// keep MONGODB_URI as full atlas uri
+await mongoose.connect(process.env.MONGODB_URI);
+
+
+// mongoose
+//   .connect(`${MONGODB_URI}/${DB_NAME}`, {
+//     // useNewUrlParser and useUnifiedTopology are deprecated but won't cause harm
+//   })
+//   .then(() => console.log(`Connected to MongoDB - Database: ${DB_NAME}`))
+//   .catch((err) => console.error("MongoDB connection error:", err));
 await mongoose.connect(process.env.MONGODB_URI);
 // Basic root route
 app.get("/", (req, res) => {
