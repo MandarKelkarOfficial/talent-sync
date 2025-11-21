@@ -41,10 +41,10 @@ async def verify_page_content(crawled_text: str, student_name: str) -> Dict[str,
     """
     
     # Clean up text to reduce token count
-    crawled_text = re.sub(r'\s+', ' ', crawled_text)
-    if len(crawled_text) > 20000: # Truncate if excessively long
-        log.warning(f"Truncating crawled text from {len(crawled_text)} to 20000 chars.")
-        crawled_text = crawled_text[:20000]
+    crawled_text_clean = re.sub(r'\s+', ' ', crawled_text)
+    if len(crawled_text_clean) > 20000: # Truncate if excessively long
+        log.warning(f"Truncating crawled text from {len(crawled_text_clean)} to 20000 chars.")
+        crawled_text_clean = crawled_text_clean[:20000]
 
     prompt = f"""
     You are an expert certificate verifier. Your task is to determine if a digital certificate,
@@ -60,7 +60,7 @@ async def verify_page_content(crawled_text: str, student_name: str) -> Dict[str,
 
     **EVIDENCE:**
     -   `RECIPIENT_NAME`: "{student_name}"
-    -   `WEBPAGE_TEXT`: "{crawled_text}"
+    -   `WEBPAGE_TEXT`: "{crawled_text_clean}"
 
     **STRICT OUTPUT FORMAT (JSON ONLY):**
     {{
@@ -99,13 +99,8 @@ async def verify_page_content(crawled_text: str, student_name: str) -> Dict[str,
         response = await client.post(api_url_with_key, json=payload)
         
         if response.status_code != 200:
-            log.error(f"--- GEMINI ERROR RESPONSE ---\nStatus: {response.status_code}\nBody: {response.text}\n--- END GEMINI ERROR RESPONSE ---")
-            return {
-                "is_verified": False,
-                "reasoning": f"Gemini API request failed with status {response.status_code}.",
-                "name_found": None,
-                "error": response.text
-            }
+            # Trigger the exception handler for fallback logic
+            raise Exception(f"Gemini API status {response.status_code}: {response.text}")
 
         result = response.json()
         json_text = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
@@ -116,13 +111,38 @@ async def verify_page_content(crawled_text: str, student_name: str) -> Dict[str,
         
         return parsed_json
 
-    except httpx.RequestError as e:
-        log.error(f"Gemini API network request error: {e}", exc_info=True)
-        return {"is_verified": False, "reasoning": f"Network error during Gemini API call: {e}", "name_found": None}
-    except json.JSONDecodeError as e:
-        log.error(f"Failed to parse Gemini JSON response: {e}. \nRaw text was: {json_text}", exc_info=True)
-        return {"is_verified": False, "reasoning": "AI analysis failed to return valid JSON.", "name_found": None}
     except Exception as e:
-        log.error(f"Unexpected error in Gemini service: {e}", exc_info=True)
-        return {"is_verified": False, "reasoning": f"An unexpected error occurred: {e}", "name_found": None}
-
+        log.error(f"Gemini API request failed or timed out: {e}")
+        
+        # --- FALLBACK VERIFICATION LOGIC ---
+        # If Gemini fails (timeout, network error, etc.), check the text manually.
+        log.info("Attempting fallback verification (Name check in crawled text)...")
+        
+        normalized_text = crawled_text.lower()
+        student_name_clean = student_name.strip().lower()
+        name_parts = student_name_clean.split()
+        
+        # Strategy 1: Exact full name match
+        name_found = False
+        if student_name_clean in normalized_text:
+            name_found = True
+        # Strategy 2: First and Last name match (for cases like "Mandar Rajendra Kelkar" vs "Mandar Kelkar")
+        elif len(name_parts) > 1 and name_parts[0] in normalized_text and name_parts[-1] in normalized_text:
+            name_found = True
+            
+        if name_found:
+            log.info(f"Fallback successful: Found '{student_name}' (or parts) in text.")
+            return {
+                "is_verified": True,
+                "reasoning": f"AI Verification failed ({str(e)}), but the student name '{student_name}' was manually found in the certificate page text.",
+                "name_found": student_name,
+                "error": str(e)
+            }
+        else:
+            log.warning("Fallback failed: Name not found in text.")
+            return {
+                "is_verified": False,
+                "reasoning": f"AI Verification failed: {e}. Manual fallback also failed to find name '{student_name}' in text.",
+                "name_found": None,
+                "error": str(e)
+            }
