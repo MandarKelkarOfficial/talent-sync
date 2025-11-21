@@ -6,3 +6,5 @@ backend/venv/
 .env
 backend/.env
 backend/encrypted_uploads/
+backend/app/__pycache__/
+backend/app/core/__pycache__/config.cpython-313.pyc
